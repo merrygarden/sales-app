@@ -219,6 +219,7 @@ select:disabled{opacity:.35;cursor:not-allowed}
   <button class="nav-tab" onclick="switchNav('expense')">ค่าใช้จ่าย</button>
   <button class="nav-tab" onclick="switchNav('dashboard')">Dashboard</button>
   <button class="nav-tab" onclick="switchNav('cfg')">ตั้งค่า</button>
+  <button class="nav-tab" onclick="syncFromSupabase()" style="margin-left:auto;color:var(--matcha);font-weight:700">↻ Sync</button>
 </nav>
 
 <div class="main">
@@ -501,26 +502,133 @@ select:disabled{opacity:.35;cursor:not-allowed}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script>
 // ═══════════════════════════════════════════════
-// STORAGE
+// SUPABASE CONFIG
 // ═══════════════════════════════════════════════
+const SB_URL='https://ucpxnjagjhcqrvdcpcup.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVjcHhuamFnamhjcXJ2ZGNwY3VwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzMzE4MTgsImV4cCI6MjA5NzkwNzgxOH0.770AuV4sXsy439AiSd7RpVh2vXSY88r54HTCHej-Qqk';
+const sbFetch=async(path,opts={})=>{
+  const res=await fetch(SB_URL+path,{
+    ...opts,
+    headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,...(opts.headers||{})}
+  });
+  if(!res.ok){const t=await res.text();throw new Error(t);}
+  const txt=await res.text();return txt?JSON.parse(txt):null;
+};
+
+// ═══════════════════════════════════════════════
+// STORAGE — Supabase + localStorage cache
+// ═══════════════════════════════════════════════
+// localStorage ใช้เป็น cache เพื่อให้แอปทำงานได้ offline และเร็ว
 const SK='sales_v3',CK='catalog_v2',GSK='gs_v1',GOALSK='goals_v1',DSK='delivery_v1',BSK='bills_v1',SHOPEESK='shopee_v1';
 const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}};
 const lsSet=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
-const loadCat=()=>lsGet(CK,JSON.parse(JSON.stringify(DEFAULT_CAT)));
-const saveCat=c=>lsSet(CK,c);
+
+// ── ENTRIES ──
 const loadEnt=()=>lsGet(SK,[]);
-const saveEnt=a=>lsSet(SK,a);
-const loadGS=()=>lsGet(GSK,{});
-const saveGS=g=>lsSet(GSK,g);
-const loadGoals=()=>lsGet(GOALSK,{});
-const saveGoals=g=>lsSet(GOALSK,g);
-const loadDel=()=>lsGet(DSK,{});
-const saveDel=d=>lsSet(DSK,d);
+const saveEnt=async(arr)=>{
+  lsSet(SK,arr);
+  // sync to Supabase in background (upsert all)
+  try{
+    await sbFetch('/rest/v1/entries?on_conflict=id',{
+      method:'POST',
+      headers:{'Prefer':'resolution=merge-duplicates'},
+      body:JSON.stringify(arr.map(e=>({
+        id:e.id,date:e.date,model:e.model,color:e.color,channel:e.channel,
+        price:e.price,base_price:e.basePrice,qty:e.qty||1,
+        extra_disc:e.extraDisc||0,total_disc:e.totalDisc||0,net:e.net,
+        order_no:e.order||'',cust_name:e.custName||'',
+        delivery_status:e.deliveryStatus||'prep',scheduled_date:e.scheduledDate||''
+      })))
+    });
+  }catch(err){console.warn('Supabase sync entries:',err.message);}
+};
+
+// ── BILLS ──
 const loadBills=()=>lsGet(BSK,[]);
-const saveBills=b=>lsSet(BSK,b);
-// shopee stored orders: [{date,model,color,orderNo}]
+const saveBills=async(arr)=>{
+  lsSet(BSK,arr);
+  try{
+    await sbFetch('/rest/v1/bills?on_conflict=id',{
+      method:'POST',
+      headers:{'Prefer':'resolution=merge-duplicates'},
+      body:JSON.stringify(arr.map(b=>({
+        id:b.id,date:b.date,vendor:b.vendor||'',
+        items:b.items,vat_mode:b.vatMode,
+        subtotal:b.subtotal,vat:b.vat,grand:b.grand,
+        receipt_img:b.receiptImg?b.receiptImg.slice(0,200)+'…':null,
+        forecast:b.forecast||null
+      })))
+    });
+  }catch(err){console.warn('Supabase sync bills:',err.message);}
+};
+
+// ── SETTINGS (catalog, goals, gs) via app_settings table ──
+const loadCat=()=>lsGet(CK,JSON.parse(JSON.stringify(DEFAULT_CAT)));
+const saveCat=async(c)=>{lsSet(CK,c);sbSetting('catalog',c).catch(()=>{});};
+const loadGS=()=>lsGet(GSK,{});
+const saveGS=async(g)=>{lsSet(GSK,g);sbSetting('gs',g).catch(()=>{});};
+const loadGoals=()=>lsGet(GOALSK,{});
+const saveGoals=async(g)=>{lsSet(GOALSK,g);sbSetting('goals',g).catch(()=>{});};
+const loadDel=()=>lsGet(DSK,{});
+const saveDel=async(d)=>{lsSet(DSK,d);sbSetting('delivery',d).catch(()=>{});};
 const loadShopeeStored=()=>lsGet(SHOPEESK,[]);
-const saveShopeeStored=a=>lsSet(SHOPEESK,a);
+const saveShopeeStored=async(a)=>{lsSet(SHOPEESK,a);sbSetting('shopee',a).catch(()=>{});};
+
+async function sbSetting(key,value){
+  await sbFetch('/rest/v1/app_settings?on_conflict=key',{
+    method:'POST',
+    headers:{'Prefer':'resolution=merge-duplicates'},
+    body:JSON.stringify({key,value})
+  });
+}
+
+// ── PULL FROM SUPABASE on load ──
+async function syncFromSupabase(){
+  showToast('กำลังซิงค์ข้อมูล...');
+  try{
+    // entries
+    const ents=await sbFetch('/rest/v1/entries?select=*&order=id.asc');
+    if(ents&&ents.length){
+      const mapped=ents.map(e=>({
+        id:e.id,date:e.date,model:e.model,color:e.color,channel:e.channel,
+        price:e.price,basePrice:e.base_price,qty:e.qty,
+        extraDisc:e.extra_disc,totalDisc:e.total_disc,net:e.net,
+        order:e.order_no,custName:e.cust_name,
+        deliveryStatus:e.delivery_status,scheduledDate:e.scheduled_date
+      }));
+      lsSet(SK,mapped);
+    }
+    // bills
+    const bills=await sbFetch('/rest/v1/bills?select=*&order=id.asc');
+    if(bills&&bills.length){
+      const mapped=bills.map(b=>({
+        id:b.id,date:b.date,vendor:b.vendor,items:b.items,
+        vatMode:b.vat_mode,subtotal:b.subtotal,vat:b.vat,grand:b.grand,
+        receiptImg:null,forecast:b.forecast
+      }));
+      lsSet(BSK,mapped);
+    }
+    // settings
+    const settings=await sbFetch('/rest/v1/app_settings?select=*');
+    if(settings){
+      settings.forEach(s=>{
+        if(s.key==='catalog') lsSet(CK,s.value);
+        if(s.key==='gs') lsSet(GSK,s.value);
+        if(s.key==='goals') lsSet(GOALSK,s.value);
+        if(s.key==='delivery') lsSet(DSK,s.value);
+        if(s.key==='shopee') lsSet(SHOPEESK,s.value);
+      });
+    }
+    showToast('ซิงค์เสร็จแล้ว ✓');
+    // refresh UI
+    genMonthOptions('hist-month');genMonthOptions('info-month');
+    genMonthOptions('bills-month');genMonthOptions('report-month');genMonthOptions('dash-month');
+    populateModels();checkOverdue();renderGoals();
+  }catch(err){
+    showToast('ซิงค์ไม่สำเร็จ (ใช้ข้อมูลในเครื่อง)');
+    console.warn('Supabase pull:',err.message);
+  }
+}
 
 const DEFAULT_CAT={
   City:{basePrice:1890,colors:['Black','Red Velvet','Brownie','White Choc'],prices:{'Black':[1890,1626,1400,1100,1000,900],'Red Velvet':[1890,1626,1400,1100,1000],'Brownie':[1890,1626,1400,1100,1000],'White Choc':[1890,1626,1400,1100,1000]}},
@@ -1410,6 +1518,8 @@ populateHistChannels();
 addItemRow();
 checkOverdue();
 renderGoals();
+// sync from Supabase on load
+syncFromSupabase();
 </script>
 </body>
 </html>
