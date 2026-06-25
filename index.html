@@ -954,6 +954,8 @@ function deleteEntry(id){
   if(!confirm('ลบรายการนี้?'))return;
   saveEnt(loadEnt().filter(e=>e.id!==id));
   const del=loadDel();delete del[id];saveDel(del);
+  // ลบจาก Supabase ด้วย
+  sbFetch(`/rest/v1/entries?id=eq.${id}`,{method:'DELETE'}).catch(e=>console.warn('delete entry:',e));
   renderHistory();checkOverdue();showToast('ลบแล้ว');
 }
 function renderHistory(){
@@ -1256,7 +1258,13 @@ function renderBills(){
   }).join('');
 }
 function toggleBill(h){const b=h.nextElementSibling,op=b.classList.toggle('open');h.querySelector('.bill-title').textContent=(op?'▼ ':'▶ ')+h.querySelector('.bill-title').textContent.slice(2);}
-function deleteBill(id){if(!confirm('ลบบิลนี้?'))return;saveBills(loadBills().filter(b=>b.id!==id));renderBills();showToast('ลบแล้ว');}
+function deleteBill(id){
+  if(!confirm('ลบบิลนี้?'))return;
+  saveBills(loadBills().filter(b=>b.id!==id));
+  // ลบจาก Supabase ด้วย
+  sbFetch(`/rest/v1/bills?id=eq.${id}`,{method:'DELETE'}).catch(e=>console.warn('delete bill:',e));
+  renderBills();showToast('ลบแล้ว');
+}
 
 // ── DOWNLOAD JPEG ──
 // ── RECEIPT RENDER ──
