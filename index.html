@@ -212,6 +212,32 @@ select:disabled{opacity:.35;cursor:not-allowed}
 </head>
 <body>
 
+<!-- LOGIN PAGE -->
+<div id="login-page" style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg)">
+  <div style="width:100%;max-width:360px;padding:1.5rem">
+    <div style="text-align:center;margin-bottom:2rem">
+      <div style="font-size:36px;margin-bottom:12px">🛍</div>
+      <div style="font-size:20px;font-weight:700;color:var(--ink);letter-spacing:.02em">Sales Tracker</div>
+      <div style="font-size:12px;color:var(--ink3);margin-top:4px;letter-spacing:.06em;text-transform:uppercase">Merry Garden</div>
+    </div>
+    <div style="background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:1.5rem">
+      <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px">
+        <label style="font-size:12px;color:var(--ink2);font-weight:600;letter-spacing:.05em;text-transform:uppercase">Email</label>
+        <input type="email" id="login-email" placeholder="your@email.com" style="padding:10px 12px;border:1px solid var(--bd);border-radius:var(--r);font-size:14px;font-family:inherit;outline:none" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:20px">
+        <label style="font-size:12px;color:var(--ink2);font-weight:600;letter-spacing:.05em;text-transform:uppercase">Password</label>
+        <input type="password" id="login-password" placeholder="••••••••" style="padding:10px 12px;border:1px solid var(--bd);border-radius:var(--r);font-size:14px;font-family:inherit;outline:none" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <div id="login-error" style="display:none;font-size:12px;color:var(--err);margin-bottom:12px;padding:8px 10px;background:var(--err-bg);border-radius:var(--r)"></div>
+      <button onclick="doLogin()" id="login-btn" style="width:100%;padding:12px;background:var(--ink);color:var(--sf);border:none;border-radius:var(--r);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:.05em">เข้าสู่ระบบ</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP (hidden until logged in) -->
+<div id="app-wrap" style="display:none">
+
 <!-- NAV -->
 <nav class="nav">
   <span class="nav-logo">🛍 Tracker</span>
@@ -220,6 +246,7 @@ select:disabled{opacity:.35;cursor:not-allowed}
   <button class="nav-tab" onclick="switchNav('dashboard')">Dashboard</button>
   <button class="nav-tab" onclick="switchNav('cfg')">ตั้งค่า</button>
   <button class="nav-tab" onclick="syncFromSupabase()" style="margin-left:auto;color:var(--matcha);font-weight:700">↻ Sync</button>
+  <button class="nav-tab" onclick="doLogout()" style="color:var(--err);font-weight:600">ออก</button>
 </nav>
 
 <div class="main">
@@ -494,6 +521,8 @@ select:disabled{opacity:.35;cursor:not-allowed}
   </div>
 </div>
 </div><!-- end .main -->
+
+</div><!-- end app-wrap -->
 
 <div class="toast" id="toast"></div>
 
@@ -1507,19 +1536,69 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
 document.addEventListener('click',e=>{if(!e.target.closest('.ac-wrap'))document.querySelectorAll('.ac-list').forEach(l=>l.style.display='none');});
 
 // ── INIT ──
-populateModels();
-genMonthOptions('hist-month');
-genMonthOptions('info-month');
-genMonthOptions('bills-month');
-genMonthOptions('report-month');
-genMonthOptions('dash-month');
-populateInfoChannels();
-populateHistChannels();
-addItemRow();
-checkOverdue();
-renderGoals();
-// sync from Supabase on load
-syncFromSupabase();
+// ═══════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════
+async function doLogin(){
+  const email=document.getElementById('login-email').value.trim();
+  const password=document.getElementById('login-password').value;
+  const errEl=document.getElementById('login-error');
+  const btn=document.getElementById('login-btn');
+  if(!email||!password){errEl.textContent='กรอก Email และ Password ให้ครบ';errEl.style.display='block';return;}
+  btn.textContent='กำลังเข้าสู่ระบบ...';btn.disabled=true;errEl.style.display='none';
+  try{
+    const res=await fetch(SB_URL+'/auth/v1/token?grant_type=password',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SB_KEY},
+      body:JSON.stringify({email,password})
+    });
+    const data=await res.json();
+    if(!res.ok) throw new Error(data.error_description||data.message||'Login ไม่สำเร็จ');
+    localStorage.setItem('sb_session',JSON.stringify({access_token:data.access_token,user:data.user}));
+    showApp();
+    initApp();
+    syncFromSupabase();
+  }catch(e){
+    errEl.textContent=e.message;errEl.style.display='block';
+    btn.textContent='เข้าสู่ระบบ';btn.disabled=false;
+  }
+}
+
+function doLogout(){
+  if(!confirm('ออกจากระบบ?'))return;
+  localStorage.removeItem('sb_session');
+  document.getElementById('app-wrap').style.display='none';
+  document.getElementById('login-page').style.display='flex';
+  document.getElementById('login-email').value='';
+  document.getElementById('login-password').value='';
+}
+
+function showApp(){
+  document.getElementById('login-page').style.display='none';
+  document.getElementById('app-wrap').style.display='block';
+}
+
+function initApp(){
+  populateModels();
+  genMonthOptions('hist-month');
+  genMonthOptions('info-month');
+  genMonthOptions('bills-month');
+  genMonthOptions('report-month');
+  genMonthOptions('dash-month');
+  populateInfoChannels();
+  populateHistChannels();
+  addItemRow();
+  checkOverdue();
+  renderGoals();
+}
+
+// ── INIT ──
+if(localStorage.getItem('sb_session')){
+  showApp();
+  initApp();
+  syncFromSupabase();
+}
+// else: แสดง login page (default)
 </script>
 </body>
 </html>
