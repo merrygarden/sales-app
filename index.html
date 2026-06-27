@@ -615,28 +615,26 @@ async function sbSetting(key,value){
 async function syncFromSupabase(){
   showToast('กำลังซิงค์ข้อมูล...');
   try{
-    // entries
+    // entries — อัปเดต localStorage เสมอ แม้ว่าจะว่าง
     const ents=await sbFetch('/rest/v1/entries?select=*&order=id.asc');
-    if(ents&&ents.length){
-      const mapped=ents.map(e=>({
-        id:e.id,date:e.date,model:e.model,color:e.color,channel:e.channel,
-        price:e.price,basePrice:e.base_price,qty:e.qty,
-        extraDisc:e.extra_disc,totalDisc:e.total_disc,net:e.net,
-        order:e.order_no,custName:e.cust_name,
-        deliveryStatus:e.delivery_status,scheduledDate:e.scheduled_date
-      }));
-      lsSet(SK,mapped);
-    }
-    // bills
+    const mappedEnts=(ents||[]).map(e=>({
+      id:e.id,date:e.date,model:e.model,color:e.color,channel:e.channel,
+      price:e.price,basePrice:e.base_price,qty:e.qty,
+      extraDisc:e.extra_disc,totalDisc:e.total_disc,net:e.net,
+      order:e.order_no,custName:e.cust_name,
+      deliveryStatus:e.delivery_status,scheduledDate:e.scheduled_date
+    }));
+    lsSet(SK,mappedEnts);
+
+    // bills — อัปเดต localStorage เสมอ
     const bills=await sbFetch('/rest/v1/bills?select=*&order=id.asc');
-    if(bills&&bills.length){
-      const mapped=bills.map(b=>({
-        id:b.id,date:b.date,vendor:b.vendor,items:b.items,
-        vatMode:b.vat_mode,subtotal:b.subtotal,vat:b.vat,grand:b.grand,
-        receiptImg:null,forecast:b.forecast
-      }));
-      lsSet(BSK,mapped);
-    }
+    const mappedBills=(bills||[]).map(b=>({
+      id:b.id,date:b.date,vendor:b.vendor,items:b.items,
+      vatMode:b.vat_mode,subtotal:b.subtotal,vat:b.vat,grand:b.grand,
+      receiptImg:null,forecast:b.forecast
+    }));
+    lsSet(BSK,mappedBills);
+
     // settings
     const settings=await sbFetch('/rest/v1/app_settings?select=*');
     if(settings){
