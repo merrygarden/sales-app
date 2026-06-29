@@ -2393,6 +2393,7 @@ function exportForecastCSV(){
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
   a.download=`alphabet_forecast_${periods}m.csv`;a.click();showToast('ดาวน์โหลดแล้ว ✓');
 }
+function genLogMonths(){
   const sel=document.getElementById('log-month');if(!sel)return;
   const TH=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
   const now=new Date();sel.innerHTML='<option value="">— ทั้งหมด —</option>';
