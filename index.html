@@ -208,7 +208,61 @@ select:disabled{opacity:.35;cursor:not-allowed}
 /* ── CAT ── */
 #cat-popup{position:fixed;bottom:-200px;right:50%;transform:translateX(50%);width:160px;transition:bottom .5s cubic-bezier(.34,1.56,.64,1),opacity .3s;z-index:1000;pointer-events:none;opacity:0;filter:drop-shadow(0 4px 12px rgba(0,0,0,.15))}
 #cat-popup.show{bottom:1.5rem;opacity:1}
-/* ── MONTH SELECTOR ── */
+/* ── MOBILE RESPONSIVE ── */
+@media (max-width: 600px){
+  body{padding:.75rem .75rem 5rem}
+  .main{padding:.75rem .75rem 5rem}
+  /* nav scroll */
+  .nav{overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;padding:0 .5rem}
+  .nav::-webkit-scrollbar{display:none}
+  .nav-logo{font-size:12px;padding:12px 10px 12px 0}
+  .nav-tab{font-size:11px;padding:12px 10px;white-space:nowrap;flex-shrink:0}
+  /* sub tabs */
+  .tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{font-size:11px;padding:8px 10px;white-space:nowrap;flex-shrink:0}
+  /* fields */
+  .field-grid{grid-template-columns:1fr}
+  /* channels */
+  .channel-grid{grid-template-columns:repeat(4,1fr)}
+  .channel-btn{font-size:10px;padding:7px 2px}
+  /* stat grid */
+  .stat-grid{grid-template-columns:repeat(2,1fr)}
+  .stat-grid.g2{grid-template-columns:1fr 1fr}
+  /* section */
+  .section{padding:1rem .875rem 1rem 1.125rem}
+  /* buttons */
+  .btn-primary{font-size:13px;padding:12px}
+  /* modal */
+  #move-modal>div,#adj-modal>div{max-width:calc(100vw - 2rem)!important;width:calc(100vw - 2rem)!important}
+  /* inv actions wrap */
+  .inv-actions-row{flex-wrap:wrap;gap:5px}
+  /* forecast table */
+  #forecast-table{overflow-x:auto}
+  #forecast-table table{min-width:360px}
+  /* history table */
+  .data-table{font-size:11px}
+  /* date row */
+  .date-row{flex-wrap:wrap}
+  .date-row input{min-width:90px}
+  /* month select */
+  .month-select-row{flex-wrap:wrap}
+  .month-select-row select{min-width:130px}
+  /* bill header */
+  .bill-header{flex-wrap:wrap;gap:6px}
+  /* stock sub tabs */
+  #sv-main-btn,#sv-defect-btn{font-size:12px;padding:9px}
+  /* vat group */
+  .vat-group{flex-direction:column}
+  .vat-btn{text-align:left}
+  /* summary section */
+  .sum-row{flex-wrap:wrap;gap:4px}
+  /* price chips */
+  .price-chips,.qty-chips{gap:5px}
+  .price-chip,.qty-chip{padding:6px 10px;font-size:12px}
+  /* cat popup */
+  #cat-popup{width:120px}
+}
 .month-select-row{display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;align-items:center}
 .month-select-row select{flex:1;min-width:120px}
 /* ── INVENTORY ── */
@@ -506,24 +560,17 @@ select:disabled{opacity:.35;cursor:not-allowed}
       <button class="btn-primary" style="margin-top:0" onclick="importDefaultInventory()">📦 นำเข้าสินค้าเริ่มต้น</button>
     </div>
     <div class="section">
-      <div class="sec-title">เพิ่มสินค้าใหม่</div>
-      <div class="field-grid">
-        <div class="field" style="grid-column:1/-1"><label>ชื่อสินค้า</label>
-          <input type="text" id="new-inv-name" placeholder="เช่น City Black"></div>
-        <div class="field"><label>จำนวน Main Stock</label>
-          <input type="number" id="new-inv-main" placeholder="0" min="0"></div>
-        <div class="field"><label>Alert เมื่อเหลือ ≤</label>
-          <input type="number" id="new-inv-alert" placeholder="20" min="0"></div>
-      </div>
-      <button class="btn-primary" onclick="addInvProduct()">+ เพิ่มสินค้า</button>
-    </div>
-    <div class="section">
       <div class="sec-title">นำเข้าจาก CSV / Excel</div>
       <p style="font-size:12px;color:var(--ink3);margin-bottom:.75rem">คอลัมน์: รายการสินค้า, จำนวน (รองรับ .xlsx และ .csv)</p>
       <div class="upload-box" onclick="document.getElementById('inv-file').click()">
         📂 อัปโหลดไฟล์ inventory (.xlsx หรือ .csv)
         <input type="file" id="inv-file" accept=".xlsx,.csv" onchange="importInvFile(this)">
       </div>
+    </div>
+    <div class="section" style="background:var(--warn-bg);border-color:#E8C97A">
+      <div class="sec-title" style="color:var(--warn)">เพิ่มสินค้าใหม่</div>
+      <p style="font-size:12px;color:var(--ink2)">สร้างสินค้าใหม่ได้จาก <b>ตั้งค่า → Model / สี / ราคา</b> เท่านั้น<br>กรอกชื่อสีพร้อมจำนวนสต็อกเริ่มต้น ระบบจะสร้างในสต็อกอัตโนมัติ</p>
+      <button class="btn-sm" onclick="switchNav('cfg')" style="margin-top:8px">ไปตั้งค่า →</button>
     </div>
   </div>
 </div>
@@ -1660,7 +1707,15 @@ function renderSettings(){
         <div style="display:flex;gap:8px"><input type="number" id="bp-${model}" value="${cat[model].basePrice||''}" min="0" style="flex:1"><button class="btn-add" onclick="saveBasePrice('${model}')">บันทึก</button></div></div>
       <div><div class="sub-lbl">สี</div>
         <div class="color-chips">${(cat[model].colors||[]).map(c=>`<div class="color-chip">${c}<button class="chip-del" onclick="deleteColor('${model}','${c}')">×</button></div>`).join('')}</div>
-        <div class="add-row"><input type="text" id="nc-${model}" placeholder="ชื่อสี"><button class="btn-add" onclick="addColor('${model}')">+ สี</button></div></div>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">
+          <div style="display:flex;gap:6px">
+            <input type="text" id="nc-${model}" placeholder="ชื่อสี" style="flex:2;padding:7px 10px;border:1px solid var(--bd);border-radius:var(--r);font-size:12px;font-family:inherit;outline:none;background:var(--bg)">
+            <input type="number" id="ns-${model}" placeholder="สต็อกเริ่มต้น" min="0" style="flex:1;padding:7px 10px;border:1px solid var(--bd);border-radius:var(--r);font-size:12px;font-family:inherit;outline:none;background:var(--bg)">
+            <button class="btn-add" onclick="addColor('${model}')">+ เพิ่ม</button>
+          </div>
+          <div style="font-size:11px;color:var(--ink3)">ชื่อสี + จำนวน Main Stock เริ่มต้น (ถ้าไม่กรอก = 0) → สร้างในสต็อกอัตโนมัติ</div>
+        </div>
+      </div>
       <div><div class="sub-lbl">ราคาขาย</div>
         <div class="color-chips">${ap.map(p=>`<div class="price-tag">฿${p.toLocaleString()}<button class="chip-del" onclick="deletePrice('${model}',${p})">×</button></div>`).join('')}</div>
         <div class="add-row"><input type="number" id="np-${model}" placeholder="ราคา" min="0"><button class="btn-add" onclick="addPrice('${model}')">+ ราคา</button></div></div>
@@ -1674,13 +1729,16 @@ function addModel(){const n=document.getElementById('new-model-input').value.tri
 function deleteModel(m){if(!confirm('ลบ "'+m+'"?'))return;const cat=loadCat();delete cat[m];saveCat(cat);renderSettings();showToast('ลบแล้ว');}
 async function addColor(model){
   const inp=document.getElementById('nc-'+model),c=inp.value.trim();if(!c)return;
+  const initStock=parseInt(document.getElementById('ns-'+model)?.value)||0;
   const cat=loadCat();
   if(!cat[model].colors.includes(c)){
     cat[model].colors.push(c);
     const all=[...new Set(Object.values(cat[model].prices).flat())];
     cat[model].prices[c]=[...all];
   }
-  saveCat(cat);inp.value='';renderSettings();
+  saveCat(cat);inp.value='';
+  const nsEl=document.getElementById('ns-'+model);if(nsEl) nsEl.value='';
+  renderSettings();
   document.getElementById('body-'+model).classList.add('open');
   // reload fresh data before checking
   await loadInvFromSB();
@@ -1688,10 +1746,12 @@ async function addColor(model){
   const norm=normName(productName);
   const exists=invData.find(i=>i.name_normalized===norm);
   if(!exists){
-    const item={name:productName,name_normalized:norm,main_stock:0,defect_stock:0,alert_level:20};
-    await saveInvToSB(item);
-    await loadInvFromSB();
-    showToast('เพิ่มสีแล้ว + สร้างในสต็อก ✓');
+    try{
+      await insertInvToSB({name:productName,name_normalized:norm,main_stock:initStock,defect_stock:0,alert_level:20});
+      if(initStock>0) await logInvTx(productName,'INIT',0,initStock,0,0,initStock,'settings','');
+      await loadInvFromSB();
+      showToast(`เพิ่มสี ${c} + สต็อก ${initStock} ✓`);
+    }catch(e){showToast('เพิ่มสีแล้ว แต่สร้างสต็อกไม่ได้');}
   } else {
     showToast('เพิ่มสีแล้ว ✓');
   }
@@ -1995,7 +2055,7 @@ function renderStock(){
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
         <span style="font-size:11px;color:var(--ink3)">${stockView==='main'?'Main Stock':'Defect Stock'} ${isLow?'⚠ ใกล้หมด':isZero?'⛔ หมดแล้ว':''}</span>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <div class="inv-actions-row" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
           <button class="btn-sm" onclick="quickAdjust(${i.id},-1,'${stockView}')">−</button>
           <button class="btn-sm" onclick="quickAdjust(${i.id},1,'${stockView}')">+</button>
           ${stockView==='main'
