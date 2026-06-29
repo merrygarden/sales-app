@@ -205,6 +205,9 @@ select:disabled{opacity:.35;cursor:not-allowed}
 /* ── TOAST ── */
 .toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--sf);padding:10px 20px;border-radius:2px;font-size:12px;font-weight:500;letter-spacing:.05em;opacity:0;transition:opacity .25s;pointer-events:none;z-index:999;white-space:nowrap}
 .toast.show{opacity:1}
+/* ── CAT ── */
+#cat-popup{position:fixed;bottom:-120px;right:1.5rem;width:80px;transition:bottom .4s cubic-bezier(.34,1.56,.64,1);z-index:1000;pointer-events:none;opacity:0}
+#cat-popup.show{bottom:1.5rem;opacity:1}
 /* ── MONTH SELECTOR ── */
 .month-select-row{display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;align-items:center}
 .month-select-row select{flex:1;min-width:120px}
@@ -444,14 +447,19 @@ select:disabled{opacity:.35;cursor:not-allowed}
         <div class="sec-title" style="margin-bottom:0">สินค้าคงเหลือ</div>
         <div style="display:flex;gap:6px">
           <button class="btn-sm" onclick="exportInvCSV()">⬇ CSV</button>
-          <button class="btn-green" onclick="renderStock()">↻</button>
+          <button class="btn-green" onclick="loadInvFromSB().then(()=>{checkLowStock();renderStock();})">↻</button>
         </div>
+      </div>
+      <!-- stock sub-tabs: Main / Defect -->
+      <div style="display:flex;border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;margin-bottom:1rem">
+        <button id="sv-main-btn" onclick="switchStockView('main')" style="flex:1;padding:8px;font-size:12px;font-weight:700;border:none;background:var(--ink);color:var(--sf);cursor:pointer;font-family:inherit">Main Stock</button>
+        <button id="sv-defect-btn" onclick="switchStockView('defect')" style="flex:1;padding:8px;font-size:12px;font-weight:500;border:none;background:var(--bg);color:var(--ink2);cursor:pointer;font-family:inherit;border-left:1px solid var(--bd)">Defect Stock</button>
       </div>
       <div style="display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap">
         <button class="btn-outline" onclick="filterInv('all')" id="if-all" style="font-weight:700">ทั้งหมด</button>
         <button class="btn-outline" onclick="filterInv('low')" id="if-low">ใกล้หมด</button>
         <button class="btn-outline" onclick="filterInv('zero')" id="if-zero">หมดแล้ว</button>
-        <input type="text" id="inv-search" placeholder="ค้นหา..." oninput="renderStock()" style="flex:1;min-width:100px;padding:5px 10px;font-size:12px">
+        <input type="text" id="inv-search" placeholder="ค้นหา..." oninput="renderStock()" style="flex:1;min-width:100px;padding:5px 10px;font-size:12px;border:1px solid var(--bd);border-radius:var(--r);font-family:inherit;outline:none">
       </div>
       <div id="stock-list"><div class="no-data">กำลังโหลด...</div></div>
     </div>
@@ -636,6 +644,7 @@ select:disabled{opacity:.35;cursor:not-allowed}
 </div><!-- end app-wrap -->
 
 <div class="toast" id="toast"></div>
+<img id="cat-popup" src="data:image/png;base64,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" alt="🐱" style="width:80px">
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -1061,7 +1070,7 @@ function saveEntry(){
     });
   }
   genMonthOptions('hist-month');genMonthOptions('info-month');
-  checkOverdue();showToast('บันทึกแล้ว ✓');resetEntryForm();
+  checkOverdue();showToast('บันทึกแล้ว ✓');showCat();resetEntryForm();
 }
 
 // ═══════════════════════════════════════════════
@@ -1644,7 +1653,25 @@ function saveBasePrice(m){const v=parseInt(document.getElementById('bp-'+m).valu
 function toggleModel(h){const b=h.nextElementSibling,op=b.classList.toggle('open');h.querySelector('.model-name').textContent=(op?'▼ ':'▶ ')+h.querySelector('.model-name').textContent.slice(2);}
 function addModel(){const n=document.getElementById('new-model-input').value.trim();if(!n)return;const cat=loadCat();if(cat[n]){showToast('มีอยู่แล้ว');return;}cat[n]={basePrice:0,colors:[],prices:{}};saveCat(cat);document.getElementById('new-model-input').value='';renderSettings();showToast('เพิ่มแล้ว ✓');}
 function deleteModel(m){if(!confirm('ลบ "'+m+'"?'))return;const cat=loadCat();delete cat[m];saveCat(cat);renderSettings();showToast('ลบแล้ว');}
-function addColor(model){const inp=document.getElementById('nc-'+model),c=inp.value.trim();if(!c)return;const cat=loadCat();if(!cat[model].colors.includes(c)){cat[model].colors.push(c);const all=[...new Set(Object.values(cat[model].prices).flat())];cat[model].prices[c]=[...all];}saveCat(cat);inp.value='';renderSettings();document.getElementById('body-'+model).classList.add('open');showToast('เพิ่มสีแล้ว');}
+function addColor(model){
+  const inp=document.getElementById('nc-'+model),c=inp.value.trim();if(!c)return;
+  const cat=loadCat();
+  if(!cat[model].colors.includes(c)){
+    cat[model].colors.push(c);
+    const all=[...new Set(Object.values(cat[model].prices).flat())];
+    cat[model].prices[c]=[...all];
+  }
+  saveCat(cat);inp.value='';renderSettings();
+  document.getElementById('body-'+model).classList.add('open');
+  // สร้างในสต็อกอัตโนมัติ
+  const productName=`${model}-${c}`;
+  const norm=normName(productName);
+  if(!invData.find(i=>normMatch(i.name,productName))){
+    const item={name:productName,name_normalized:norm,main_stock:0,defect_stock:0,alert_level:20};
+    saveInvToSB(item).then(()=>loadInvFromSB()).catch(()=>{});
+  }
+  showToast('เพิ่มสีแล้ว + สร้างในสต็อก ✓');
+}
 function deleteColor(model,c){if(!confirm('ลบสี?'))return;const cat=loadCat();cat[model].colors=cat[model].colors.filter(x=>x!==c);delete cat[model].prices[c];saveCat(cat);renderSettings();document.getElementById('body-'+model).classList.add('open');showToast('ลบสีแล้ว');}
 function addPrice(model){const inp=document.getElementById('np-'+model),p=parseInt(inp.value);if(!p)return;const cat=loadCat();cat[model].colors.forEach(c=>{if(!cat[model].prices[c])cat[model].prices[c]=[];if(!cat[model].prices[c].includes(p)){cat[model].prices[c].push(p);cat[model].prices[c].sort((a,b)=>b-a);}});saveCat(cat);inp.value='';renderSettings();document.getElementById('body-'+model).classList.add('open');showToast('เพิ่มราคาแล้ว');}
 function deletePrice(model,p){const cat=loadCat();cat[model].colors.forEach(c=>{if(cat[model].prices[c])cat[model].prices[c]=cat[model].prices[c].filter(x=>x!==p);});saveCat(cat);renderSettings();document.getElementById('body-'+model).classList.add('open');showToast('ลบราคาแล้ว');}
@@ -1677,6 +1704,13 @@ function resetBillForm(){
   vatMode='none';clearReceipt();addItemRow();
 }
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);}
+
+function showCat(){
+  const cat=document.getElementById('cat-popup');
+  if(!cat)return;
+  cat.classList.add('show');
+  setTimeout(()=>cat.classList.remove('show'),2500);
+}
 
 // close ac on outside click
 document.addEventListener('click',e=>{if(!e.target.closest('.ac-wrap'))document.querySelectorAll('.ac-list').forEach(l=>l.style.display='none');});
@@ -1747,8 +1781,8 @@ let invData=[];
 let invFilter='all';
 let selStockSource='main';
 
-const normName=n=>n.trim().toLowerCase();
-const displayToCSV=n=>n.trim().replace(/\s+/g,'-');
+const normName=n=>n.trim().toLowerCase().replace(/-/g,' '); // normalize: dash = space
+const normMatch=(a,b)=>normName(a)===normName(b); // compare ignoring dash/space
 
 async function loadInvFromSB(){
   try{
@@ -1760,8 +1794,11 @@ async function loadInvFromSB(){
 async function saveInvToSB(item){
   await sbFetch('/rest/v1/inventory?on_conflict=name_normalized',{
     method:'POST',headers:{'Prefer':'resolution=merge-duplicates'},
-    body:JSON.stringify({name:item.name,name_normalized:item.name_normalized,
-      main_stock:item.main_stock,defect_stock:item.defect_stock,alert_level:item.alert_level})
+    body:JSON.stringify({
+      name:item.name,
+      name_normalized:normName(item.name), // normalized ไม่มี dash
+      main_stock:item.main_stock,defect_stock:item.defect_stock,alert_level:item.alert_level
+    })
   });
 }
 
@@ -1776,21 +1813,26 @@ async function logInvTx(productName,type,mainBefore,mainAfter,defectBefore,defec
 }
 
 async function deductStock(productName,qty,stockSrc){
-  const norm=normName(productName);
-  const item=invData.find(i=>i.name_normalized===norm);
-  if(!item)return;
+  const item=invData.find(i=>normMatch(i.name,productName));
+  if(!item) return;
   const mainB=item.main_stock,defB=item.defect_stock;
-  if(stockSrc==='defect') item.defect_stock=Math.max(0,item.defect_stock-qty);
-  else item.main_stock=Math.max(0,item.main_stock-qty);
+  if(stockSrc==='defect'){
+    const newVal=item.defect_stock-qty;
+    if(newVal<0) showToast(`⚠ ${item.name} Defect Stock ติดลบ (${newVal})`);
+    item.defect_stock=newVal;
+  } else {
+    const newVal=item.main_stock-qty;
+    if(newVal<0) showToast(`⚠ ${item.name} Main Stock ติดลบ (${newVal})`);
+    item.main_stock=newVal;
+  }
   await saveInvToSB(item);
   await logInvTx(item.name,'SALE',mainB,item.main_stock,defB,item.defect_stock,qty,'sale','');
   checkLowStock();
 }
 
 async function restoreStock(productName,qty,stockSrc){
-  const norm=normName(productName);
-  const item=invData.find(i=>i.name_normalized===norm);
-  if(!item)return;
+  const item=invData.find(i=>normMatch(i.name,productName));
+  if(!item) return;
   const mainB=item.main_stock,defB=item.defect_stock;
   if(stockSrc==='defect') item.defect_stock+=qty;
   else item.main_stock+=qty;
@@ -1821,7 +1863,7 @@ function updateStockAvail(){
   const el=document.getElementById('stock-avail');if(!el)return;
   if(!model||!color){el.textContent='';return;}
   const pname=`${model} ${color}`;
-  const item=invData.find(i=>i.name_normalized===normName(pname));
+  const item=invData.find(i=>normMatch(i.name,pname));
   if(!item){el.textContent='ไม่พบในสต็อก';return;}
   const avail=selStockSource==='defect'?item.defect_stock:item.main_stock;
   el.textContent=`คงเหลือ: ${avail} ชิ้น`;
@@ -1840,9 +1882,31 @@ function switchInvTab(t){
   if(t==='ilog'){genLogMonths();renderLog();}
 }
 
+let stockView='main'; // 'main' or 'defect'
+
+function switchStockView(v){
+  stockView=v;
+  const mainBtn=document.getElementById('sv-main-btn');
+  const defBtn=document.getElementById('sv-defect-btn');
+  if(mainBtn){
+    mainBtn.style.background=v==='main'?'var(--ink)':'var(--bg)';
+    mainBtn.style.color=v==='main'?'var(--sf)':'var(--ink2)';
+    mainBtn.style.fontWeight=v==='main'?'700':'500';
+  }
+  if(defBtn){
+    defBtn.style.background=v==='defect'?'var(--ink)':'var(--bg)';
+    defBtn.style.color=v==='defect'?'var(--sf)':'var(--ink2)';
+    defBtn.style.fontWeight=v==='defect'?'700':'500';
+  }
+  renderStock();
+}
+
 function filterInv(f){
   invFilter=f;
-  ['all','low','zero'].forEach(x=>document.getElementById('if-'+x).style.fontWeight=x===f?'700':'400');
+  ['all','low','zero'].forEach(x=>{
+    const el=document.getElementById('if-'+x);
+    if(el) el.style.fontWeight=x===f?'700':'400';
+  });
   renderStock();
 }
 
@@ -1851,32 +1915,128 @@ function renderStock(){
   let data=[...invData].sort((a,b)=>a.name_normalized.localeCompare(b.name_normalized));
   if(search) data=data.filter(i=>i.name_normalized.includes(search));
   if(invFilter==='low') data=data.filter(i=>i.main_stock>0&&i.main_stock<=i.alert_level);
-  if(invFilter==='zero') data=data.filter(i=>i.main_stock===0);
+  if(invFilter==='zero') data=data.filter(i=>stockView==='main'?i.main_stock===0:i.defect_stock===0);
   const el=document.getElementById('stock-list');if(!el)return;
   if(!data.length){el.innerHTML='<div class="no-data">ไม่มีรายการ</div>';return;}
+
   el.innerHTML=data.map(i=>{
-    const isLow=i.main_stock>0&&i.main_stock<=i.alert_level,isZero=i.main_stock===0;
-    const cardCls=isZero?'inv-card no-stock':isLow?'inv-card low-stock':'inv-card';
-    return`<div class="${cardCls}">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start">
-        <div><div class="inv-name">${i.name}</div><div style="font-size:11px;color:var(--ink3);margin-top:2px">Alert ≤ ${i.alert_level}</div></div>
-        <div class="inv-stocks">
-          <span class="stock-pill ${isZero?'stock-low':'stock-main'}">Main: ${i.main_stock}</span>
-          ${i.defect_stock>0?`<span class="stock-pill stock-defect">Defect: ${i.defect_stock}</span>`:''}
+    const qty=stockView==='main'?i.main_stock:i.defect_stock;
+    const isLow=stockView==='main'&&i.main_stock>0&&i.main_stock<=i.alert_level;
+    const isZero=qty===0;
+    const borderColor=isZero?'#E8A09A':isLow?'#E8C97A':'var(--bd)';
+    const bg=isZero?'#FFF8F8':isLow?'#FFFDF5':'var(--sf)';
+    return`<div style="border:1px solid ${borderColor};border-radius:var(--r);padding:12px;margin-bottom:6px;background:${bg}">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:14px;font-weight:600;color:var(--ink)">${i.name}</span>
+        <span style="font-size:22px;font-weight:500;color:${isZero?'var(--err)':isLow?'var(--warn)':'var(--matcha)'}">${qty}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+        <span style="font-size:11px;color:var(--ink3)">${stockView==='main'?'Main Stock':'Defect Stock'} ${isLow?'⚠ ใกล้หมด':isZero?'⛔ หมดแล้ว':''}</span>
+        <div style="display:flex;gap:6px">
+          <button class="btn-sm" onclick="quickAdjust(${i.id},-1,'${stockView}')">−</button>
+          <button class="btn-sm" onclick="quickAdjust(${i.id},1,'${stockView}')">+</button>
+          <button class="btn-outline" onclick="openMoveModal(${i.id})">⇄ ย้าย</button>
+          <button class="btn-outline" onclick="toggleAlert(${i.id})">🔔</button>
+          <button class="btn-danger-sm" onclick="deleteInvProduct(${i.id})">ลบ</button>
         </div>
       </div>
-      <div class="inv-actions">
-        <input type="number" class="inv-qty-input" id="adj-qty-${i.id}" placeholder="1" min="1" value="1">
-        <button class="btn-sm" onclick="adjustStock(${i.id},'add','main')">+ Main</button>
-        <button class="btn-sm" onclick="adjustStock(${i.id},'sub','main')">− Main</button>
-        <button class="btn-outline" onclick="moveToDefect(${i.id})">→ Defect</button>
-        <button class="btn-outline" onclick="moveToMain(${i.id})">→ Main</button>
-        <input type="number" class="inv-qty-input" id="alert-${i.id}" value="${i.alert_level}" title="Alert level">
-        <button class="btn-sm" onclick="saveAlertLevel(${i.id})">Set Alert</button>
-        <button class="btn-danger-sm" onclick="deleteInvProduct(${i.id})">ลบ</button>
+      <!-- Alert panel (hidden by default) -->
+      <div id="alert-panel-${i.id}" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--bd2)">
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-size:12px;color:var(--ink2)">แจ้งเตือนเมื่อเหลือ ≤</span>
+          <input type="number" id="alert-${i.id}" value="${i.alert_level}" min="0" style="width:60px;padding:5px 8px;border:1px solid var(--bd);border-radius:var(--r);font-size:13px;font-family:inherit;outline:none;text-align:center">
+          <button class="btn-add" onclick="saveAlertLevel(${i.id})">บันทึก</button>
+        </div>
       </div>
     </div>`;
   }).join('');
+}
+
+function quickAdjust(id,delta,src){
+  const item=invData.find(i=>i.id===id);if(!item)return;
+  const current=src==='main'?item.main_stock:item.defect_stock;
+  const dir=delta>0?'เพิ่ม':'ลด';
+  const existing=document.getElementById('adj-modal');if(existing)existing.remove();
+  const modal=document.createElement('div');
+  modal.id='adj-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.innerHTML=`<div style="background:var(--sf);border-radius:var(--r);padding:1.5rem;width:100%;max-width:300px;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+    <div style="font-size:15px;font-weight:700;margin-bottom:4px">${item.name}</div>
+    <div style="font-size:12px;color:var(--ink3);margin-bottom:1.25rem">${src==='main'?'Main':'Defect'} Stock ปัจจุบัน: <b>${current}</b></div>
+    <div style="font-size:12px;color:var(--ink2);font-weight:600;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">จำนวนที่จะ${dir}</div>
+    <input type="number" id="adj-qty-modal" value="1" min="1" style="width:100%;padding:10px;border:1px solid var(--bd);border-radius:var(--r);font-size:20px;font-family:inherit;outline:none;text-align:center;margin-bottom:1rem" autofocus>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button class="btn-primary" style="margin-top:0;background:${delta>0?'var(--matcha)':'var(--err)'}" onclick="confirmAdjust(${id},${delta},'${src}')">
+        ${delta>0?'+ เพิ่ม':'− ลด'}
+      </button>
+      <button onclick="document.getElementById('adj-modal').remove()" style="padding:12px;border:1px solid var(--bd);border-radius:var(--r);background:none;font-size:13px;cursor:pointer;font-family:inherit;color:var(--ink2)">ยกเลิก</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.onclick=e=>{if(e.target===modal)modal.remove();};
+  setTimeout(()=>document.getElementById('adj-qty-modal')?.select(),100);
+}
+
+async function confirmAdjust(id,delta,src){
+  const item=invData.find(i=>i.id===id);if(!item)return;
+  const qty=parseInt(document.getElementById('adj-qty-modal')?.value)||1;
+  const mainB=item.main_stock,defB=item.defect_stock;
+  if(src==='main') item.main_stock=Math.max(0,item.main_stock+(delta>0?qty:-qty));
+  else item.defect_stock=Math.max(0,item.defect_stock+(delta>0?qty:-qty));
+  await saveInvToSB(item);
+  await logInvTx(item.name,'ADJUST',mainB,item.main_stock,defB,item.defect_stock,delta>0?qty:-qty,'manual','');
+  document.getElementById('adj-modal')?.remove();
+  checkLowStock();renderStock();showToast('อัปเดตแล้ว ✓');
+}
+
+// toggle alert panel
+function toggleAlert(id){
+  const panel=document.getElementById(`alert-panel-${id}`);
+  if(panel) panel.style.display=panel.style.display==='none'?'block':'none';
+}
+
+// Move modal
+function openMoveModal(id){
+  const item=invData.find(i=>i.id===id);if(!item)return;
+  const existing=document.getElementById('move-modal');
+  if(existing) existing.remove();
+  const modal=document.createElement('div');
+  modal.id='move-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.innerHTML=`<div style="background:var(--sf);border-radius:var(--r);padding:1.5rem;width:100%;max-width:320px;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+    <div style="font-size:15px;font-weight:700;margin-bottom:4px">${item.name}</div>
+    <div style="font-size:12px;color:var(--ink3);margin-bottom:1.25rem">Main: ${item.main_stock} &nbsp;|&nbsp; Defect: ${item.defect_stock}</div>
+    <div style="font-size:12px;color:var(--ink2);font-weight:600;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">จำนวนที่จะย้าย</div>
+    <input type="number" id="move-qty" value="1" min="1" style="width:100%;padding:10px;border:1px solid var(--bd);border-radius:var(--r);font-size:16px;font-family:inherit;outline:none;text-align:center;margin-bottom:1rem">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:.75rem">
+      <button class="btn-primary" style="margin-top:0;background:var(--err)" onclick="doMove(${id},'defect')">Main → Defect</button>
+      <button class="btn-primary" style="margin-top:0;background:var(--matcha)" onclick="doMove(${id},'main')">Defect → Main</button>
+    </div>
+    <button onclick="document.getElementById('move-modal').remove()" style="width:100%;padding:8px;border:1px solid var(--bd);border-radius:var(--r);background:none;font-size:13px;cursor:pointer;font-family:inherit;color:var(--ink2)">ยกเลิก</button>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.onclick=e=>{if(e.target===modal)modal.remove();};
+}
+
+async function doMove(id,direction){
+  const item=invData.find(i=>i.id===id);if(!item)return;
+  const qty=parseInt(document.getElementById('move-qty')?.value)||1;
+  const mainB=item.main_stock,defB=item.defect_stock;
+  if(direction==='defect'){
+    if(item.main_stock<qty){showToast('Main Stock ไม่พอ');return;}
+    item.main_stock-=qty;item.defect_stock+=qty;
+    await saveInvToSB(item);
+    await logInvTx(item.name,'MOVE_DEFECT',mainB,item.main_stock,defB,item.defect_stock,qty,'manual','');
+    showToast('ย้ายไป Defect แล้ว ✓');
+  } else {
+    if(item.defect_stock<qty){showToast('Defect Stock ไม่พอ');return;}
+    item.defect_stock-=qty;item.main_stock+=qty;
+    await saveInvToSB(item);
+    await logInvTx(item.name,'MOVE_MAIN',mainB,item.main_stock,defB,item.defect_stock,qty,'manual','');
+    showToast('ย้ายไป Main แล้ว ✓');
+  }
+  document.getElementById('move-modal')?.remove();
+  checkLowStock();renderStock();
 }
 
 async function adjustStock(id,dir,src){
