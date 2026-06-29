@@ -208,6 +208,32 @@ select:disabled{opacity:.35;cursor:not-allowed}
 /* ── MONTH SELECTOR ── */
 .month-select-row{display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;align-items:center}
 .month-select-row select{flex:1;min-width:120px}
+/* ── INVENTORY ── */
+.inv-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--bd2)}
+.inv-row:last-child{border-bottom:none}
+.inv-name{font-size:13px;font-weight:600;color:var(--ink)}
+.inv-stocks{display:flex;gap:10px;align-items:center}
+.stock-pill{font-size:11px;padding:3px 8px;border-radius:2px;font-weight:600}
+.stock-main{background:var(--ok-bg);color:var(--ok)}
+.stock-defect{background:var(--err-bg);color:var(--err)}
+.stock-low{background:var(--warn-bg);color:var(--warn)}
+.inv-actions{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
+.inv-card{border:1px solid var(--bd);border-radius:var(--r);padding:10px 12px;margin-bottom:6px}
+.inv-card.low-stock{border-color:#E8C97A;background:#FFFDF5}
+.inv-card.no-stock{border-color:#E8A09A;background:#FFF8F8}
+.alert-banner{background:var(--warn-bg);border:1px solid #E8C97A;border-radius:var(--r);padding:10px 14px;margin-bottom:.875rem;font-size:13px;color:var(--warn);font-weight:600;cursor:pointer}
+.inv-qty-input{width:60px;padding:4px 8px;border:1px solid var(--bd);border-radius:var(--r);font-size:13px;font-family:inherit;outline:none;text-align:center}
+.inv-qty-input:focus{border-color:var(--kinari)}
+.log-row{display:flex;justify-content:space-between;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--bd2);font-size:12px}
+.log-row:last-child{border-bottom:none}
+.log-type{font-size:10px;padding:2px 7px;border-radius:2px;font-weight:700;letter-spacing:.04em;flex-shrink:0}
+.log-sale{background:var(--ok-bg);color:var(--ok)}
+.log-adjust{background:#E8F0FE;color:#1A4A9A}
+.log-move{background:var(--warn-bg);color:var(--warn)}
+.log-restore{background:#F3EBFE;color:#5A2A8A}
+.stock-src-group{display:flex;gap:8px;margin-top:.5rem}
+.stock-src-btn{flex:1;padding:8px;border:1px solid var(--bd);border-radius:var(--r);font-size:12px;cursor:pointer;background:none;font-family:inherit;font-weight:500;transition:all .15s;text-align:center}
+.stock-src-btn.active{border-color:var(--ink);background:var(--ink);color:var(--sf)}
 </style>
 </head>
 <body>
@@ -242,6 +268,7 @@ select:disabled{opacity:.35;cursor:not-allowed}
 <nav class="nav">
   <span class="nav-logo">🛍 Tracker</span>
   <button class="nav-tab active" onclick="switchNav('sales')">ยอดขาย</button>
+  <button class="nav-tab" onclick="switchNav('inventory')">สต็อก</button>
   <button class="nav-tab" onclick="switchNav('expense')">ค่าใช้จ่าย</button>
   <button class="nav-tab" onclick="switchNav('dashboard')">Dashboard</button>
   <button class="nav-tab" onclick="switchNav('cfg')">ตั้งค่า</button>
@@ -251,6 +278,7 @@ select:disabled{opacity:.35;cursor:not-allowed}
 
 <div class="main">
 <div id="overdue-banner" onclick="switchSalesTab('delivery')">⚠ มีรายการค้างส่งเกินกำหนด — กดเพื่อดู</div>
+<div id="low-stock-banner" class="alert-banner" style="display:none" onclick="switchNav('inventory')">⚠ สินค้าใกล้หมดสต็อก — กดเพื่อดู</div>
 
 <!-- ════════════════════ SALES ════════════════════ -->
 <div class="page active" id="nav-sales">
@@ -263,6 +291,14 @@ select:disabled{opacity:.35;cursor:not-allowed}
 
   <!-- ENTRY -->
   <div class="page active" id="stab-entry">
+    <div class="section">
+      <div class="sec-title">แหล่งสต็อก</div>
+      <div class="stock-src-group">
+        <button class="stock-src-btn active" onclick="selStockSrc(this,'main')" id="src-main">📦 Main Stock</button>
+        <button class="stock-src-btn" onclick="selStockSrc(this,'defect')" id="src-defect">⚠ Defect Stock</button>
+      </div>
+      <div id="stock-avail" style="font-size:12px;color:var(--ink3);margin-top:6px"></div>
+    </div>
     <div class="section">
       <div class="sec-title">สินค้า</div>
       <div class="field-grid">
@@ -311,6 +347,7 @@ select:disabled{opacity:.35;cursor:not-allowed}
     </div>
     <div class="section" id="summary-section" style="display:none">
       <div class="sec-title">สรุป</div>
+      <div class="sum-row"><span class="sl">แหล่งสต็อก</span><span class="sv" id="sum-stock-src"></span></div>
       <div class="sum-row"><span class="sl">สินค้า</span><span class="sv" id="sum-product"></span></div>
       <div class="sum-row"><span class="sl">ชื่อ</span><span class="sv" id="sum-name"></span></div>
       <div class="sum-row"><span class="sl">ช่องทาง</span><span class="sv" id="sum-channel"></span></div>
@@ -392,6 +429,79 @@ select:disabled{opacity:.35;cursor:not-allowed}
   </div>
 </div>
 
+<!-- ════════════════════ INVENTORY ════════════════════ -->
+<div class="page" id="nav-inventory">
+  <div class="tabs">
+    <button class="tab active" onclick="switchInvTab('istock')">สต็อก</button>
+    <button class="tab" onclick="switchInvTab('ilog')">ประวัติ</button>
+    <button class="tab" onclick="switchInvTab('imanage')">จัดการ</button>
+  </div>
+
+  <!-- STOCK VIEW -->
+  <div class="page active" id="stab-istock">
+    <div class="section">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.875rem">
+        <div class="sec-title" style="margin-bottom:0">สินค้าคงเหลือ</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn-sm" onclick="exportInvCSV()">⬇ CSV</button>
+          <button class="btn-green" onclick="renderStock()">↻</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap">
+        <button class="btn-outline" onclick="filterInv('all')" id="if-all" style="font-weight:700">ทั้งหมด</button>
+        <button class="btn-outline" onclick="filterInv('low')" id="if-low">ใกล้หมด</button>
+        <button class="btn-outline" onclick="filterInv('zero')" id="if-zero">หมดแล้ว</button>
+        <input type="text" id="inv-search" placeholder="ค้นหา..." oninput="renderStock()" style="flex:1;min-width:100px;padding:5px 10px;font-size:12px">
+      </div>
+      <div id="stock-list"><div class="no-data">กำลังโหลด...</div></div>
+    </div>
+  </div>
+
+  <!-- LOG -->
+  <div class="page" id="stab-ilog">
+    <div class="section">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.875rem">
+        <div class="sec-title" style="margin-bottom:0">ประวัติการเปลี่ยนแปลง</div>
+        <button class="btn-sm" onclick="exportLogCSV()">⬇ CSV</button>
+      </div>
+      <div class="month-select-row">
+        <select id="log-month" onchange="renderLog()"><option value="">— ทั้งหมด —</option></select>
+        <input type="text" id="log-search" placeholder="ค้นหาสินค้า..." oninput="renderLog()" style="flex:1;padding:7px 10px;border:1px solid var(--bd);border-radius:var(--r);font-size:12px;font-family:inherit;outline:none">
+      </div>
+      <div id="log-list"><div class="no-data">กำลังโหลด...</div></div>
+    </div>
+  </div>
+
+  <!-- MANAGE -->
+  <div class="page" id="stab-imanage">
+    <div class="section">
+      <div class="sec-title">นำเข้าสินค้าเริ่มต้น</div>
+      <p style="font-size:12px;color:var(--ink3);margin-bottom:.75rem">City 4 สี + 18mm Alphabet A-Z ทั้งหมด 30 รายการ</p>
+      <button class="btn-primary" style="margin-top:0" onclick="importDefaultInventory()">📦 นำเข้าสินค้าเริ่มต้น</button>
+    </div>
+    <div class="section">
+      <div class="sec-title">เพิ่มสินค้าใหม่</div>
+      <div class="field-grid">
+        <div class="field" style="grid-column:1/-1"><label>ชื่อสินค้า</label>
+          <input type="text" id="new-inv-name" placeholder="เช่น City Black"></div>
+        <div class="field"><label>จำนวน Main Stock</label>
+          <input type="number" id="new-inv-main" placeholder="0" min="0"></div>
+        <div class="field"><label>Alert เมื่อเหลือ ≤</label>
+          <input type="number" id="new-inv-alert" placeholder="20" min="0"></div>
+      </div>
+      <button class="btn-primary" onclick="addInvProduct()">+ เพิ่มสินค้า</button>
+    </div>
+    <div class="section">
+      <div class="sec-title">นำเข้าจาก CSV / Excel</div>
+      <p style="font-size:12px;color:var(--ink3);margin-bottom:.75rem">คอลัมน์: รายการสินค้า, จำนวน (รองรับ .xlsx และ .csv)</p>
+      <div class="upload-box" onclick="document.getElementById('inv-file').click()">
+        📂 อัปโหลดไฟล์ inventory (.xlsx หรือ .csv)
+        <input type="file" id="inv-file" accept=".xlsx,.csv" onchange="importInvFile(this)">
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ════════════════════ EXPENSE ════════════════════ -->
 <div class="page" id="nav-expense">
   <div class="tabs">
@@ -465,7 +575,8 @@ select:disabled{opacity:.35;cursor:not-allowed}
     <div class="section">
       <div class="month-select-row">
         <select id="bills-month" onchange="renderBills()"><option value="">— ทุกเดือน —</option></select>
-        <button class="btn-green" onclick="downloadAllReceipts()">⬇ Download ทั้งหมด (ZIP)</button>
+        <button class="btn-green" onclick="downloadAllReceipts()">⬇ ZIP รูป</button>
+        <button class="btn-copy" onclick="exportExpenseCSV()">⬇ CSV</button>
       </div>
       <div id="forecast-alerts"></div>
       <div id="bill-list"><div class="no-data">เลือกเดือนด้านบน</div></div>
@@ -651,6 +762,8 @@ async function syncFromSupabase(){
     genMonthOptions('hist-month');genMonthOptions('info-month');
     genMonthOptions('bills-month');genMonthOptions('report-month');genMonthOptions('dash-month');
     populateModels();checkOverdue();renderGoals();
+    // sync inventory
+    await loadInvFromSB();checkLowStock();
   }catch(err){
     showToast('ซิงค์ไม่สำเร็จ (ใช้ข้อมูลในเครื่อง)');
     console.warn('Supabase pull:',err.message);
@@ -658,8 +771,7 @@ async function syncFromSupabase(){
 }
 
 const DEFAULT_CAT={
-  City:{basePrice:1890,colors:['Black','Red Velvet','Brownie','White Choc'],prices:{'Black':[1890,1626,1400,1100,1000,900],'Red Velvet':[1890,1626,1400,1100,1000],'Brownie':[1890,1626,1400,1100,1000],'White Choc':[1890,1626,1400,1100,1000]}},
-  Wallet:{basePrice:590,colors:['Black','Teal','Mustard','Light Grey','Deep Matcha','Pink Pearl','Lipstick Red','Navy'],prices:{'Black':[590,299,250,200],'Teal':[590,299,250,200],'Mustard':[590,299,250,200],'Light Grey':[590,299,250,200],'Deep Matcha':[590,299,250,200],'Pink Pearl':[590,299,250,200],'Lipstick Red':[590,299,250,200],'Navy':[590,299,250,200]}}
+  City:{basePrice:1890,colors:['Black','Red Velvet','Brownie','White Choc'],prices:{'Black':[1890,1626,1400,1100,1000,900],'Red Velvet':[1890,1626,1400,1100,1000],'Brownie':[1890,1626,1400,1100,1000],'White Choc':[1890,1626,1400,1100,1000]}}
 };
 
 // ═══════════════════════════════════════════════
@@ -718,11 +830,12 @@ function genMonthOptions(selId,addAll=true){
 // NAV
 // ═══════════════════════════════════════════════
 function switchNav(n){
-  ['sales','expense','dashboard','cfg'].forEach((x,i)=>{
+  ['sales','inventory','expense','dashboard','cfg'].forEach((x,i)=>{
     document.querySelectorAll('.nav-tab')[i].classList.toggle('active',x===n);
     document.getElementById('nav-'+x).classList.toggle('active',x===n);
   });
   if(n==='sales'){genMonthOptions('hist-month');genMonthOptions('info-month');populateInfoChannels();populateHistChannels();populateModels();checkOverdue();}
+  if(n==='inventory'){loadInvFromSB().then(()=>{checkLowStock();renderStock();});}
   if(n==='expense'){genMonthOptions('bills-month');genMonthOptions('report-month');renderBills();renderForecastAlerts();}
   if(n==='dashboard'){genMonthOptions('dash-month');renderDashboard();}
   if(n==='cfg'){loadSettingsUI();}
@@ -876,7 +989,7 @@ function onModelChange(){
   document.getElementById('discount-row').style.display='none';document.getElementById('summary-section').style.display='none';document.getElementById('btn-save').disabled=true;
   if(!model){csel.disabled=true;return;}
   (cat[model].colors||[]).forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;csel.appendChild(o);});
-  csel.disabled=false;autoFillOrder();
+  csel.disabled=false;autoFillOrder();updateStockAvail();
 }
 function onColorChange(){
   const cat=loadCat(),model=document.getElementById('model-select').value,color=document.getElementById('color-select').value;
@@ -891,7 +1004,7 @@ function onColorChange(){
     btn.onclick=()=>{document.querySelectorAll('.price-chip').forEach(c=>c.classList.remove('active'));btn.classList.add('active');selPr=p;document.getElementById('discount-row').style.display='';document.getElementById('discount-input').value='';calcNet();};
     chips.appendChild(btn);
   });
-  autoFillOrder();
+  autoFillOrder();updateStockAvail();
 }
 function selectChannel(el,name){
   document.querySelectorAll('.channel-btn').forEach(b=>b.classList.remove('active'));
@@ -915,6 +1028,7 @@ function calcNet(){
   if(!model||!color||!selPr||!selCh){document.getElementById('summary-section').style.display='none';document.getElementById('btn-save').disabled=true;return;}
   const cat=loadCat(),bp=cat[model]?.basePrice||selPr;
   const td=(bp-selPr)*selQty+ed,net=selPr*selQty-ed;
+  document.getElementById('sum-stock-src').textContent=selStockSource==='defect'?'Defect Stock':'Main Stock';
   document.getElementById('sum-product').textContent=`${model} – ${color} ×${selQty}`;
   document.getElementById('sum-name').textContent=custName||'—';
   document.getElementById('sum-channel').textContent=selCh;
@@ -932,9 +1046,20 @@ function saveEntry(){
   const td=(bp-selPr)*selQty+ed,net=selPr*selQty-ed;
   const id=Date.now();
   const ents=loadEnt();
-  ents.push({id,date,model,color,channel:selCh,price:selPr,basePrice:bp,qty:selQty,discPerUnit:bp-selPr,extraDisc:ed,totalDisc:td,net,order,custName});
+  ents.push({id,date,model,color,channel:selCh,price:selPr,basePrice:bp,qty:selQty,discPerUnit:bp-selPr,extraDisc:ed,totalDisc:td,net,order,custName,stockSrc:selStockSource});
   saveEnt(ents);
   const del=loadDel();del[id]={status:'prep',scheduledDate:''};saveDel(del);
+  // ตัดสต็อกสินค้าหลัก
+  const productName=`${model} ${color}`;
+  deductStock(productName,selQty,selStockSource);
+  // ตัดสต็อก alphabet ตามจำนวนตัวอักษรจริง เช่น AAMY → A×2, M×1, Y×1
+  if(custName){
+    const letterCount={};
+    custName.toUpperCase().split('').forEach(l=>{if(/[A-Z]/.test(l)) letterCount[l]=(letterCount[l]||0)+1;});
+    Object.entries(letterCount).forEach(([letter,count])=>{
+      deductStock(`18mm-${letter}-alphabet`,count,'main');
+    });
+  }
   genMonthOptions('hist-month');genMonthOptions('info-month');
   checkOverdue();showToast('บันทึกแล้ว ✓');resetEntryForm();
 }
@@ -950,10 +1075,22 @@ function populateHistChannels(){
 }
 function deleteEntry(id){
   if(!confirm('ลบรายการนี้?'))return;
-  saveEnt(loadEnt().filter(e=>e.id!==id));
+  const ents=loadEnt();
+  const entry=ents.find(e=>e.id===id);
+  saveEnt(ents.filter(e=>e.id!==id));
   const del=loadDel();delete del[id];saveDel(del);
-  // ลบจาก Supabase ด้วย
   sbFetch(`/rest/v1/entries?id=eq.${id}`,{method:'DELETE'}).catch(e=>console.warn('delete entry:',e));
+  if(entry){
+    restoreStock(`${entry.model} ${entry.color}`,entry.qty||1,entry.stockSrc||'main');
+    // คืนสต็อก alphabet
+    if(entry.custName){
+      const letterCount={};
+      entry.custName.toUpperCase().split('').forEach(l=>{if(/[A-Z]/.test(l)) letterCount[l]=(letterCount[l]||0)+1;});
+      Object.entries(letterCount).forEach(([letter,count])=>{
+        restoreStock(`18mm-${letter}-alphabet`,count,'main');
+      });
+    }
+  }
   renderHistory();checkOverdue();showToast('ลบแล้ว');
 }
 function renderHistory(){
@@ -1527,6 +1664,9 @@ function resetEntryForm(){
   document.querySelectorAll('.channel-btn').forEach(b=>b.classList.remove('active'));
   document.querySelectorAll('.qty-chip').forEach((b,i)=>b.classList.toggle('active',i===0));
   selCh='';selPr=null;selQty=1;custName='';
+  selStockSource='main';
+  document.querySelectorAll('.stock-src-btn').forEach((b,i)=>b.classList.toggle('active',i===0));
+  document.getElementById('stock-avail').textContent='';
 }
 function resetBillForm(){
   document.getElementById('bill-date').value=today;document.getElementById('bill-vendor').value='';
@@ -1596,6 +1736,386 @@ function initApp(){
   addItemRow();
   checkOverdue();
   renderGoals();
+  // โหลด inventory
+  loadInvFromSB().then(()=>checkLowStock());
+}
+
+// ═══════════════════════════════════════════════
+// INVENTORY
+// ═══════════════════════════════════════════════
+let invData=[];
+let invFilter='all';
+let selStockSource='main';
+
+const normName=n=>n.trim().toLowerCase();
+const displayToCSV=n=>n.trim().replace(/\s+/g,'-');
+
+async function loadInvFromSB(){
+  try{
+    const data=await sbFetch('/rest/v1/inventory?select=*&order=name_normalized.asc');
+    invData=data||[];return invData;
+  }catch(e){console.warn('inv load:',e);return[];}
+}
+
+async function saveInvToSB(item){
+  await sbFetch('/rest/v1/inventory?on_conflict=name_normalized',{
+    method:'POST',headers:{'Prefer':'resolution=merge-duplicates'},
+    body:JSON.stringify({name:item.name,name_normalized:item.name_normalized,
+      main_stock:item.main_stock,defect_stock:item.defect_stock,alert_level:item.alert_level})
+  });
+}
+
+async function logInvTx(productName,type,mainBefore,mainAfter,defectBefore,defectAfter,qtyChanged,source,refId=''){
+  try{
+    await sbFetch('/rest/v1/inventory_log',{method:'POST',
+      body:JSON.stringify({product_name:productName,transaction_type:type,
+        main_before:mainBefore,main_after:mainAfter,defect_before:defectBefore,
+        defect_after:defectAfter,qty_changed:qtyChanged,source,ref_id:String(refId)})
+    });
+  }catch(e){console.warn('log tx:',e);}
+}
+
+async function deductStock(productName,qty,stockSrc){
+  const norm=normName(productName);
+  const item=invData.find(i=>i.name_normalized===norm);
+  if(!item)return;
+  const mainB=item.main_stock,defB=item.defect_stock;
+  if(stockSrc==='defect') item.defect_stock=Math.max(0,item.defect_stock-qty);
+  else item.main_stock=Math.max(0,item.main_stock-qty);
+  await saveInvToSB(item);
+  await logInvTx(item.name,'SALE',mainB,item.main_stock,defB,item.defect_stock,qty,'sale','');
+  checkLowStock();
+}
+
+async function restoreStock(productName,qty,stockSrc){
+  const norm=normName(productName);
+  const item=invData.find(i=>i.name_normalized===norm);
+  if(!item)return;
+  const mainB=item.main_stock,defB=item.defect_stock;
+  if(stockSrc==='defect') item.defect_stock+=qty;
+  else item.main_stock+=qty;
+  await saveInvToSB(item);
+  await logInvTx(item.name,'RESTORE',mainB,item.main_stock,defB,item.defect_stock,qty,'delete','');
+  checkLowStock();
+}
+
+function checkLowStock(){
+  const low=invData.filter(i=>i.main_stock>0&&i.main_stock<=i.alert_level);
+  const zero=invData.filter(i=>i.main_stock===0);
+  const banner=document.getElementById('low-stock-banner');
+  if(!banner)return;
+  if(low.length||zero.length){
+    banner.style.display='block';
+    banner.textContent=`⚠ สินค้าใกล้หมด ${low.length} รายการ, หมดแล้ว ${zero.length} รายการ — กดเพื่อดู`;
+  } else banner.style.display='none';
+}
+
+function selStockSrc(el,src){
+  document.querySelectorAll('.stock-src-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');selStockSource=src;updateStockAvail();
+}
+
+function updateStockAvail(){
+  const model=document.getElementById('model-select').value;
+  const color=document.getElementById('color-select').value;
+  const el=document.getElementById('stock-avail');if(!el)return;
+  if(!model||!color){el.textContent='';return;}
+  const pname=`${model} ${color}`;
+  const item=invData.find(i=>i.name_normalized===normName(pname));
+  if(!item){el.textContent='ไม่พบในสต็อก';return;}
+  const avail=selStockSource==='defect'?item.defect_stock:item.main_stock;
+  el.textContent=`คงเหลือ: ${avail} ชิ้น`;
+  el.style.color=avail<=item.alert_level?'var(--err)':'var(--ok)';
+}
+
+function switchInvTab(t){
+  const tabs=['istock','ilog','imanage'];
+  const tabBtns=document.querySelectorAll('#nav-inventory .tabs .tab');
+  tabs.forEach((n,i)=>{
+    if(tabBtns[i]) tabBtns[i].classList.toggle('active',n===t);
+    const el=document.getElementById('stab-'+n);
+    if(el) el.classList.toggle('active',n===t);
+  });
+  if(t==='istock') renderStock();
+  if(t==='ilog'){genLogMonths();renderLog();}
+}
+
+function filterInv(f){
+  invFilter=f;
+  ['all','low','zero'].forEach(x=>document.getElementById('if-'+x).style.fontWeight=x===f?'700':'400');
+  renderStock();
+}
+
+function renderStock(){
+  const search=(document.getElementById('inv-search')?.value||'').toLowerCase();
+  let data=[...invData].sort((a,b)=>a.name_normalized.localeCompare(b.name_normalized));
+  if(search) data=data.filter(i=>i.name_normalized.includes(search));
+  if(invFilter==='low') data=data.filter(i=>i.main_stock>0&&i.main_stock<=i.alert_level);
+  if(invFilter==='zero') data=data.filter(i=>i.main_stock===0);
+  const el=document.getElementById('stock-list');if(!el)return;
+  if(!data.length){el.innerHTML='<div class="no-data">ไม่มีรายการ</div>';return;}
+  el.innerHTML=data.map(i=>{
+    const isLow=i.main_stock>0&&i.main_stock<=i.alert_level,isZero=i.main_stock===0;
+    const cardCls=isZero?'inv-card no-stock':isLow?'inv-card low-stock':'inv-card';
+    return`<div class="${cardCls}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div><div class="inv-name">${i.name}</div><div style="font-size:11px;color:var(--ink3);margin-top:2px">Alert ≤ ${i.alert_level}</div></div>
+        <div class="inv-stocks">
+          <span class="stock-pill ${isZero?'stock-low':'stock-main'}">Main: ${i.main_stock}</span>
+          ${i.defect_stock>0?`<span class="stock-pill stock-defect">Defect: ${i.defect_stock}</span>`:''}
+        </div>
+      </div>
+      <div class="inv-actions">
+        <input type="number" class="inv-qty-input" id="adj-qty-${i.id}" placeholder="1" min="1" value="1">
+        <button class="btn-sm" onclick="adjustStock(${i.id},'add','main')">+ Main</button>
+        <button class="btn-sm" onclick="adjustStock(${i.id},'sub','main')">− Main</button>
+        <button class="btn-outline" onclick="moveToDefect(${i.id})">→ Defect</button>
+        <button class="btn-outline" onclick="moveToMain(${i.id})">→ Main</button>
+        <input type="number" class="inv-qty-input" id="alert-${i.id}" value="${i.alert_level}" title="Alert level">
+        <button class="btn-sm" onclick="saveAlertLevel(${i.id})">Set Alert</button>
+        <button class="btn-danger-sm" onclick="deleteInvProduct(${i.id})">ลบ</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function adjustStock(id,dir,src){
+  const item=invData.find(i=>i.id===id);if(!item)return;
+  const qty=parseInt(document.getElementById(`adj-qty-${id}`)?.value)||1;
+  const mainB=item.main_stock,defB=item.defect_stock;
+  if(src==='main'){if(dir==='add')item.main_stock+=qty;else item.main_stock=Math.max(0,item.main_stock-qty);}
+  else{if(dir==='add')item.defect_stock+=qty;else item.defect_stock=Math.max(0,item.defect_stock-qty);}
+  await saveInvToSB(item);
+  await logInvTx(item.name,'ADJUST',mainB,item.main_stock,defB,item.defect_stock,dir==='add'?qty:-qty,'manual','');
+  checkLowStock();renderStock();showToast('อัปเดตแล้ว ✓');
+}
+
+async function moveToDefect(id){
+  const item=invData.find(i=>i.id===id);if(!item)return;
+  const qty=parseInt(document.getElementById(`adj-qty-${id}`)?.value)||1;
+  if(item.main_stock<qty){showToast('Main Stock ไม่พอ');return;}
+  const mainB=item.main_stock,defB=item.defect_stock;
+  item.main_stock-=qty;item.defect_stock+=qty;
+  await saveInvToSB(item);
+  await logInvTx(item.name,'MOVE_DEFECT',mainB,item.main_stock,defB,item.defect_stock,qty,'manual','');
+  checkLowStock();renderStock();showToast('ย้ายไป Defect แล้ว ✓');
+}
+
+async function moveToMain(id){
+  const item=invData.find(i=>i.id===id);if(!item)return;
+  const qty=parseInt(document.getElementById(`adj-qty-${id}`)?.value)||1;
+  if(item.defect_stock<qty){showToast('Defect Stock ไม่พอ');return;}
+  const mainB=item.main_stock,defB=item.defect_stock;
+  item.defect_stock-=qty;item.main_stock+=qty;
+  await saveInvToSB(item);
+  await logInvTx(item.name,'MOVE_MAIN',mainB,item.main_stock,defB,item.defect_stock,qty,'manual','');
+  checkLowStock();renderStock();showToast('ย้ายไป Main แล้ว ✓');
+}
+
+async function saveAlertLevel(id){
+  const item=invData.find(i=>i.id===id);if(!item)return;
+  const val=parseInt(document.getElementById(`alert-${id}`)?.value);
+  if(isNaN(val)||val<0)return;
+  item.alert_level=val;
+  await saveInvToSB(item);checkLowStock();renderStock();showToast('บันทึก Alert แล้ว ✓');
+}
+
+async function addInvProduct(){
+  const name=document.getElementById('new-inv-name').value.trim();
+  const main=parseInt(document.getElementById('new-inv-main').value)||0;
+  const alert=parseInt(document.getElementById('new-inv-alert').value)||20;
+  if(!name){showToast('กรอกชื่อสินค้า');return;}
+  const norm=normName(name);
+  if(invData.find(i=>i.name_normalized===norm)){showToast('มีสินค้านี้อยู่แล้ว');return;}
+  const item={name,name_normalized:norm,main_stock:main,defect_stock:0,alert_level:alert};
+  await saveInvToSB(item);
+  if(main>0) await logInvTx(name,'INIT',0,main,0,0,main,'manual','');
+  await loadInvFromSB();
+  document.getElementById('new-inv-name').value='';
+  document.getElementById('new-inv-main').value='';
+  document.getElementById('new-inv-alert').value='';
+  checkLowStock();renderStock();showToast('เพิ่มสินค้าแล้ว ✓');
+}
+
+async function deleteInvProduct(id){
+  if(!confirm('ลบสินค้านี้?'))return;
+  await sbFetch(`/rest/v1/inventory?id=eq.${id}`,{method:'DELETE'});
+  invData=invData.filter(i=>i.id!==id);
+  renderStock();showToast('ลบแล้ว');
+}
+
+async function importInvFile(input){
+  const file=input.files[0];if(!file)return;
+  showToast('กำลังอ่านไฟล์...');
+  const ext=file.name.split('.').pop().toLowerCase();
+
+  if(ext==='csv'){
+    // อ่าน CSV โดยตรง ไม่ต้องพึ่ง library
+    const text=await file.text();
+    const lines=text.split(/\r?\n/).filter(l=>l.trim());
+    const rows=[];
+    // หา header row
+    let startRow=0;
+    for(let i=0;i<Math.min(3,lines.length);i++){
+      if(lines[i].includes('รายการสินค้า')||lines[i].includes('name')){startRow=i+1;break;}
+    }
+    for(let i=startRow;i<lines.length;i++){
+      const cols=lines[i].split(',').map(c=>c.replace(/^"|"$/g,'').trim());
+      if(cols[0]) rows.push({name:cols[0],qty:parseInt(cols[1])||0});
+    }
+    await processInvRows(rows);
+  } else if(ext==='xlsx'){
+    if(typeof XLSX==='undefined'){
+      showToast('ไม่รองรับ .xlsx ใน local — ใช้ .csv แทนได้ครับ');
+      return;
+    }
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const raw=XLSX.utils.sheet_to_json(ws,{defval:0});
+    const rows=raw.map(r=>({
+      name:String(r['รายการสินค้า']||r['name']||'').trim(),
+      qty:parseInt(r['จำนวน']||r['main_stock']||0)
+    }));
+    await processInvRows(rows);
+  } else {
+    showToast('รองรับเฉพาะ .csv และ .xlsx');
+  }
+  input.value='';
+}
+
+async function processInvRows(rows){
+  let added=0,updated=0;
+  for(const row of rows){
+    if(!row.name)continue;
+    const norm=normName(row.name);
+    const existing=invData.find(i=>i.name_normalized===norm);
+    if(existing){
+      const mainB=existing.main_stock;existing.main_stock=row.qty;
+      await saveInvToSB(existing);
+      await logInvTx(existing.name,'IMPORT',mainB,row.qty,existing.defect_stock,existing.defect_stock,row.qty-mainB,'import','');
+      updated++;
+    } else {
+      const item={name:row.name,name_normalized:norm,main_stock:row.qty,defect_stock:0,alert_level:20};
+      await saveInvToSB(item);
+      if(row.qty>0) await logInvTx(row.name,'INIT',0,row.qty,0,0,row.qty,'import','');
+      added++;
+    }
+  }
+  await loadInvFromSB();checkLowStock();renderStock();
+  showToast(`นำเข้าแล้ว: เพิ่ม ${added}, อัปเดต ${updated} ✓`);
+}
+
+// นำเข้าสินค้าเริ่มต้นจาก Excel file ที่กำหนดไว้
+const DEFAULT_INVENTORY=[
+  {name:'City-Black',qty:0},{name:'City-Red Velvet',qty:30},
+  {name:'City-White Choc',qty:0},{name:'City-Brownie',qty:1},
+  {name:'18mm-A-alphabet',qty:0},{name:'18mm-B-alphabet',qty:0},
+  {name:'18mm-C-alphabet',qty:0},{name:'18mm-D-alphabet',qty:0},
+  {name:'18mm-E-alphabet',qty:0},{name:'18mm-F-alphabet',qty:0},
+  {name:'18mm-G-alphabet',qty:0},{name:'18mm-H-alphabet',qty:0},
+  {name:'18mm-I-alphabet',qty:0},{name:'18mm-J-alphabet',qty:0},
+  {name:'18mm-K-alphabet',qty:0},{name:'18mm-L-alphabet',qty:0},
+  {name:'18mm-M-alphabet',qty:0},{name:'18mm-N-alphabet',qty:0},
+  {name:'18mm-O-alphabet',qty:0},{name:'18mm-P-alphabet',qty:0},
+  {name:'18mm-Q-alphabet',qty:0},{name:'18mm-R-alphabet',qty:0},
+  {name:'18mm-S-alphabet',qty:0},{name:'18mm-T-alphabet',qty:0},
+  {name:'18mm-U-alphabet',qty:0},{name:'18mm-V-alphabet',qty:0},
+  {name:'18mm-W-alphabet',qty:0},{name:'18mm-X-alphabet',qty:0},
+  {name:'18mm-Y-alphabet',qty:0},{name:'18mm-Z-alphabet',qty:0},
+];
+
+async function importDefaultInventory(){
+  if(!confirm(`นำเข้าสินค้าเริ่มต้น ${DEFAULT_INVENTORY.length} รายการ?\n(ถ้ามีอยู่แล้วจะไม่เขียนทับ)`))return;
+  showToast('กำลังนำเข้า...');
+  let added=0,skipped=0;
+  for(const p of DEFAULT_INVENTORY){
+    const norm=normName(p.name);
+    if(invData.find(i=>i.name_normalized===norm)){skipped++;continue;}
+    const item={name:p.name,name_normalized:norm,main_stock:p.qty,defect_stock:0,alert_level:20};
+    await saveInvToSB(item);
+    if(p.qty>0) await logInvTx(p.name,'INIT',0,p.qty,0,0,p.qty,'default','');
+    added++;
+  }
+  await loadInvFromSB();checkLowStock();renderStock();
+  showToast(`นำเข้าแล้ว ${added} รายการ, ข้าม ${skipped} ✓`);
+}
+
+function genLogMonths(){
+  const sel=document.getElementById('log-month');if(!sel)return;
+  const TH=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const now=new Date();sel.innerHTML='<option value="">— ทั้งหมด —</option>';
+  for(let i=0;i<6;i++){const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const val=d.getFullYear()+'-'+(String(d.getMonth()+1).padStart(2,'0'));
+    const o=document.createElement('option');o.value=val;o.textContent=TH[d.getMonth()+1]+' '+d.getFullYear();sel.appendChild(o);}
+}
+
+async function renderLog(){
+  const mo=document.getElementById('log-month')?.value||'';
+  const search=(document.getElementById('log-search')?.value||'').toLowerCase();
+  try{
+    const data=await sbFetch('/rest/v1/inventory_log?select=*&order=created_at.desc&limit=300');
+    let logs=data||[];
+    if(mo) logs=logs.filter(l=>l.created_at?.startsWith(mo));
+    if(search) logs=logs.filter(l=>l.product_name?.toLowerCase().includes(search));
+    const el=document.getElementById('log-list');if(!el)return;
+    if(!logs.length){el.innerHTML='<div class="no-data">ไม่มีประวัติ</div>';return;}
+    const typeLabel={SALE:'ขาย',RESTORE:'คืน',ADJUST:'แก้ไข',MOVE_DEFECT:'→Defect',MOVE_MAIN:'→Main',INIT:'เริ่มต้น',IMPORT:'นำเข้า'};
+    const typeCls={SALE:'log-sale',RESTORE:'log-restore',ADJUST:'log-adjust',MOVE_DEFECT:'log-move',MOVE_MAIN:'log-move',INIT:'log-adjust',IMPORT:'log-adjust'};
+    el.innerHTML=logs.map(l=>`<div class="log-row">
+      <div style="display:flex;flex-direction:column;gap:3px;flex:1">
+        <span style="font-size:13px;font-weight:600">${l.product_name}</span>
+        <span style="color:var(--ink3)">${(l.created_at||'').slice(0,16).replace('T',' ')}</span>
+        <span style="font-size:11px;color:var(--ink2)">Main: ${l.main_before}→${l.main_after} / Defect: ${l.defect_before}→${l.defect_after}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+        <span class="log-type ${typeCls[l.transaction_type]||'log-adjust'}">${typeLabel[l.transaction_type]||l.transaction_type}</span>
+        <span style="font-size:12px;color:var(--ink2)">${l.qty_changed>0?'+':''}${l.qty_changed}</span>
+      </div>
+    </div>`).join('');
+  }catch(e){document.getElementById('log-list').innerHTML='<div class="no-data">โหลดไม่ได้</div>';}
+}
+
+function exportInvCSV(){
+  if(!invData.length){showToast('ไม่มีข้อมูล');return;}
+  const rows=[['ชื่อสินค้า','Main Stock','Defect Stock','Total','Alert Level'],
+    ...[...invData].sort((a,b)=>a.name_normalized.localeCompare(b.name_normalized))
+      .map(i=>[i.name,i.main_stock,i.defect_stock,i.main_stock+i.defect_stock,i.alert_level])];
+  const csv='\uFEFF'+rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download='inventory.csv';a.click();showToast('ดาวน์โหลดแล้ว ✓');
+}
+
+async function exportLogCSV(){
+  try{
+    const data=await sbFetch('/rest/v1/inventory_log?select=*&order=created_at.desc');
+    const logs=data||[];if(!logs.length){showToast('ไม่มีประวัติ');return;}
+    const rows=[['วันที่','เวลา','ชื่อสินค้า','ประเภท','Main ก่อน','Main หลัง','Defect ก่อน','Defect หลัง','จำนวนที่เปลี่ยน','แหล่งที่มา'],
+      ...logs.map(l=>{const dt=(l.created_at||'').split('T');
+        return[dt[0]||'',dt[1]?.slice(0,8)||'',l.product_name,l.transaction_type,
+          l.main_before,l.main_after,l.defect_before,l.defect_after,l.qty_changed,l.source];})];
+    const csv='\uFEFF'+rows.map(r=>r.map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\r\n');
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+    a.download='inventory_log.csv';a.click();showToast('ดาวน์โหลดแล้ว ✓');
+  }catch(e){showToast('โหลดไม่ได้');}
+}
+
+function exportExpenseCSV(){
+  const mo=document.getElementById('bills-month').value;
+  let bills=loadBills();if(mo) bills=bills.filter(b=>b.date.startsWith(mo));
+  if(!bills.length){showToast('ไม่มีข้อมูล');return;}
+  const rows=[['วันที่','รายการ','หมวดหมู่','จำนวนเงิน','VAT','รวม','ผู้จัดจำหน่าย']];
+  bills.forEach(b=>{
+    const cat=classifyBill(b);
+    b.items.forEach(i=>rows.push([b.date,i.name,cat.cat,fmtB(i.qty*i.price),
+      b.vatMode==='none'?'ไม่มี':b.vatMode==='included'?'รวมแล้ว':'7%',fmtB(b.grand),b.vendor]));
+  });
+  const csv='\uFEFF'+rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download=`expense_${mo||'all'}.csv`;a.click();showToast('ดาวน์โหลดแล้ว ✓');
 }
 
 // ── INIT ──
