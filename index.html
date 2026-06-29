@@ -6,11 +6,13 @@
 <title>Sales & Expense Tracker</title>
 <style>
 :root{
-  --bg:#F7F5F2;--sf:#FDFCFB;--ink:#1C1C1A;--ink2:#4A4A47;--ink3:#8A8A86;
-  --kinari:#C8B89A;--matcha:#3D6B4A;--matcha-lt:#EBF3ED;
-  --bd:#E2DDD8;--bd2:#EDE9E4;
-  --warn-bg:#FDF5E6;--warn:#8A6010;--err-bg:#FCEEED;--err:#8A2A20;
-  --ok-bg:#EBF3ED;--ok:#2A5E38;--r:4px;
+  --bg:#F2F0E8;--sf:#FAFAF7;--ink:#2C2C2A;--ink2:#5C5C58;--ink3:#9A9A94;
+  --kinari:#B8C4A0;--matcha:#7A6FA0;--matcha-lt:#F0EDF8;
+  --bd:#D8DDD0;--bd2:#E8ECE0;
+  --warn-bg:#F5F0FF;--warn:#6B5A9A;--err-bg:#FCEEED;--err:#8A2A20;
+  --ok-bg:#EEF2E6;--ok:#4A6A30;--r:4px;
+  --sf2:#EEF2E6;
+  --primary:#6B7A4A;--primary-dk:#4A5A30;--primary-lt:#EEF2E6;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN',-apple-system,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;-webkit-font-smoothing:antialiased}
@@ -18,32 +20,32 @@ body{font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN',-apple-system,sans-
 .nav{background:var(--sf);border-bottom:1px solid var(--bd);display:flex;align-items:stretch;padding:0 1rem;position:sticky;top:0;z-index:100}
 .nav-logo{font-size:13px;font-weight:700;letter-spacing:.04em;padding:14px 16px 14px 0;border-right:1px solid var(--bd);margin-right:4px;white-space:nowrap;color:var(--ink)}
 .nav-tab{padding:14px 14px;font-size:12px;font-weight:500;cursor:pointer;border:none;background:none;color:var(--ink3);border-bottom:2px solid transparent;margin-bottom:-1px;font-family:inherit;letter-spacing:.03em;transition:color .15s;white-space:nowrap}
-.nav-tab.active{color:var(--ink);border-bottom-color:var(--ink);font-weight:700}
+.nav-tab.active{color:var(--ink);border-bottom-color:var(--primary);font-weight:700}
 /* ── LAYOUT ── */
 .main{max-width:560px;margin:0 auto;padding:1.25rem 1rem 5rem}
 .section{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:1.125rem 1.125rem 1.125rem 1.375rem;margin-bottom:.875rem;position:relative}
-.section::before{content:'';position:absolute;left:0;top:.875rem;bottom:.875rem;width:2px;background:var(--bd);border-radius:0 2px 2px 0}
+.section::before{content:'';position:absolute;left:0;top:.875rem;bottom:.875rem;width:3px;background:var(--primary);border-radius:0 2px 2px 0}
 .sec-title{font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:.875rem;letter-spacing:.08em;text-transform:uppercase}
 .page{display:none}.page.active{display:block}
 /* ── TABS (sub) ── */
 .tabs{display:flex;border-bottom:1px solid var(--bd);margin-bottom:1.25rem;overflow-x:auto}
 .tab{padding:9px 12px;font-size:12px;font-weight:500;cursor:pointer;border:none;background:none;color:var(--ink3);border-bottom:2px solid transparent;margin-bottom:-1px;font-family:inherit;white-space:nowrap;transition:color .15s}
-.tab.active{color:var(--ink);border-bottom-color:var(--ink);font-weight:700}
+.tab.active{color:var(--primary);border-bottom-color:var(--primary);font-weight:700}
 /* ── FIELDS ── */
 .field-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .field{display:flex;flex-direction:column;gap:5px}
 label{font-size:13px;color:var(--ink2);font-weight:500}
 select,input[type=text],input[type=date],input[type=number],input[type=month]{width:100%;padding:8px 10px;border:1px solid var(--bd);border-radius:var(--r);font-size:14px;color:var(--ink);background:var(--sf);outline:none;font-family:inherit;font-weight:400;transition:border-color .15s}
-select:focus,input:focus{border-color:var(--kinari)}
+select:focus,input:focus{border-color:#CFE3BF;outline:none;box-shadow:0 0 0 2px rgba(111,143,87,.15)}
 select:disabled{opacity:.35;cursor:not-allowed}
 /* ── BUTTONS ── */
-.btn-primary{width:100%;padding:12px;background:var(--ink);color:var(--sf);border:none;border-radius:var(--r);font-size:13px;font-weight:600;letter-spacing:.06em;cursor:pointer;margin-top:.875rem;font-family:inherit;transition:opacity .15s}
-.btn-primary:hover{opacity:.82}.btn-primary:disabled{opacity:.25;cursor:not-allowed}
+.btn-primary{width:100%;padding:12px;background:var(--primary);color:#fff;border:none;border-radius:var(--r);font-size:13px;font-weight:600;letter-spacing:.06em;cursor:pointer;margin-top:.875rem;font-family:inherit;transition:background .15s}
+.btn-primary:hover{background:var(--primary-dk)}.btn-primary:disabled{opacity:.35;cursor:not-allowed}
 .btn-sm{padding:7px 12px;border:1px solid var(--bd);border-radius:var(--r);background:none;font-size:12px;cursor:pointer;color:var(--ink2);font-family:inherit;font-weight:500;transition:all .15s}
 .btn-sm:hover{border-color:var(--ink2);color:var(--ink)}
 .btn-green{padding:7px 12px;border:1px solid var(--matcha);border-radius:var(--r);background:var(--matcha-lt);font-size:12px;cursor:pointer;color:var(--matcha);font-family:inherit;font-weight:600}
 .btn-copy{padding:7px 12px;border:1px solid var(--bd);border-radius:var(--r);background:none;font-size:12px;cursor:pointer;color:var(--ink2);font-family:inherit;font-weight:500}
-.btn-add{padding:7px 12px;border:1px solid var(--ink);border-radius:var(--r);background:var(--ink);color:var(--sf);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit}
+.btn-add{padding:7px 12px;border:1px solid var(--primary);border-radius:var(--r);background:var(--primary);color:#fff;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit}
 .btn-outline{padding:5px 9px;border:1px solid var(--bd);border-radius:var(--r);background:none;font-size:11px;cursor:pointer;color:var(--ink2);font-family:inherit;transition:all .15s}
 .btn-outline:hover{border-color:var(--ink2)}
 .btn-danger-sm{padding:5px 9px;border:1px solid var(--err);border-radius:var(--r);background:none;font-size:11px;cursor:pointer;color:var(--err);font-family:inherit}
@@ -53,11 +55,11 @@ select:disabled{opacity:.35;cursor:not-allowed}
 .price-chips,.qty-chips{display:flex;flex-wrap:wrap;gap:6px}
 .price-chip,.qty-chip{padding:6px 14px;border:1px solid var(--bd);border-radius:2px;font-size:13px;cursor:pointer;color:var(--ink2);background:none;font-family:inherit;font-weight:400;transition:all .15s}
 .price-chip.active{border-color:var(--matcha);color:var(--matcha);background:var(--matcha-lt);font-weight:600}
-.qty-chip.active{border-color:var(--ink);color:var(--ink);background:var(--bg);font-weight:700}
+.qty-chip.active{border-color:var(--primary);color:#fff;background:var(--primary);font-weight:700}
 /* ── CHANNELS ── */
 .channel-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 .channel-btn{padding:8px 4px;border:1px solid var(--bd);border-radius:var(--r);font-size:11px;color:var(--ink2);background:none;cursor:pointer;text-align:center;font-family:inherit;font-weight:500;line-height:1.5;transition:all .15s}
-.channel-btn.active{border-color:var(--ink);color:var(--sf);background:var(--ink)}
+.channel-btn.active{border-color:var(--primary);color:#fff;background:var(--primary)}
 /* ── SUMMARY ── */
 .sum-row{display:flex;justify-content:space-between;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--bd2)}
 .sum-row:last-child{border-bottom:none;padding-top:10px}
@@ -102,8 +104,8 @@ select:disabled{opacity:.35;cursor:not-allowed}
 .chart-bar-wrap{margin-bottom:10px}
 .chart-label{font-size:12px;color:var(--ink2);margin-bottom:4px;display:flex;justify-content:space-between;font-weight:500}
 .chart-bar-bg{background:var(--bd);height:4px;border-radius:2px}
-.chart-bar-fill{background:var(--ink);height:4px;border-radius:2px;transition:width .5s ease}
-.chart-bar-fill.green{background:var(--matcha)}
+.chart-bar-fill{background:var(--primary);height:4px;border-radius:2px;transition:width .5s ease}
+.chart-bar-fill.green{background:#99A558}
 .chart-bar-fill.red{background:#C0392B}
 /* ── TABLE ── */
 .data-table{width:100%;border-collapse:collapse;font-size:12px}
@@ -203,7 +205,7 @@ select:disabled{opacity:.35;cursor:not-allowed}
 /* ── NO DATA ── */
 .no-data{font-size:12px;color:var(--ink3);padding:2rem;text-align:center;font-weight:400}
 /* ── TOAST ── */
-.toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--sf);padding:10px 20px;border-radius:2px;font-size:12px;font-weight:500;letter-spacing:.05em;opacity:0;transition:opacity .25s;pointer-events:none;z-index:999;white-space:nowrap}
+.toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:#1F2937;color:#fff;padding:10px 20px;border-radius:2px;font-size:12px;font-weight:500;letter-spacing:.05em;opacity:0;transition:opacity .25s;pointer-events:none;z-index:999;white-space:nowrap}
 .toast.show{opacity:1}
 /* ── CAT ── */
 #cat-popup{position:fixed;bottom:-200px;right:50%;transform:translateX(50%);width:160px;transition:bottom .5s cubic-bezier(.34,1.56,.64,1),opacity .3s;z-index:1000;pointer-events:none;opacity:0;filter:drop-shadow(0 4px 12px rgba(0,0,0,.15))}
@@ -290,7 +292,7 @@ select:disabled{opacity:.35;cursor:not-allowed}
 .log-restore{background:#F3EBFE;color:#5A2A8A}
 .stock-src-group{display:flex;gap:8px;margin-top:.5rem}
 .stock-src-btn{flex:1;padding:8px;border:1px solid var(--bd);border-radius:var(--r);font-size:12px;cursor:pointer;background:none;font-family:inherit;font-weight:500;transition:all .15s;text-align:center}
-.stock-src-btn.active{border-color:var(--ink);background:var(--ink);color:var(--sf)}
+.stock-src-btn.active{border-color:var(--primary);background:var(--primary);color:#fff}
 </style>
 </head>
 <body>
@@ -313,7 +315,7 @@ select:disabled{opacity:.35;cursor:not-allowed}
         <input type="password" id="login-password" placeholder="••••••••" style="padding:10px 12px;border:1px solid var(--bd);border-radius:var(--r);font-size:14px;font-family:inherit;outline:none" onkeydown="if(event.key==='Enter')doLogin()">
       </div>
       <div id="login-error" style="display:none;font-size:12px;color:var(--err);margin-bottom:12px;padding:8px 10px;background:var(--err-bg);border-radius:var(--r)"></div>
-      <button onclick="doLogin()" id="login-btn" style="width:100%;padding:12px;background:var(--ink);color:var(--sf);border:none;border-radius:var(--r);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:.05em">เข้าสู่ระบบ</button>
+      <button onclick="doLogin()" id="login-btn" style="width:100%;padding:12px;background:var(--primary);color:#fff;border:none;border-radius:var(--r);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:.05em;transition:background .15s" onmouseover="this.style.background='var(--primary-dk)'" onmouseout="this.style.background='var(--primary)'">เข้าสู่ระบบ</button>
     </div>
   </div>
 </div>
@@ -507,8 +509,8 @@ select:disabled{opacity:.35;cursor:not-allowed}
       </div>
       <!-- stock sub-tabs: Main / Defect -->
       <div style="display:flex;border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;margin-bottom:1rem">
-        <button id="sv-main-btn" onclick="switchStockView('main')" style="flex:1;padding:8px;font-size:12px;font-weight:700;border:none;background:var(--ink);color:var(--sf);cursor:pointer;font-family:inherit">Main Stock</button>
-        <button id="sv-defect-btn" onclick="switchStockView('defect')" style="flex:1;padding:8px;font-size:12px;font-weight:500;border:none;background:var(--bg);color:var(--ink2);cursor:pointer;font-family:inherit;border-left:1px solid var(--bd)">Defect Stock</button>
+        <button id="sv-main-btn" onclick="switchStockView('main')" style="flex:1;padding:8px;font-size:12px;font-weight:700;border:none;background:var(--primary);color:#fff;cursor:pointer;font-family:inherit">Main Stock</button>
+        <button id="sv-defect-btn" onclick="switchStockView('defect')" style="flex:1;padding:8px;font-size:12px;font-weight:500;border:none;background:var(--sf2);color:var(--ink2);cursor:pointer;font-family:inherit;border-left:1px solid var(--bd)">Defect Stock</button>
       </div>
       <div style="display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap">
         <button class="btn-outline" onclick="filterInv('all')" id="if-all" style="font-weight:700">ทั้งหมด</button>
@@ -1729,34 +1731,134 @@ function addModel(){const n=document.getElementById('new-model-input').value.tri
 function deleteModel(m){if(!confirm('ลบ "'+m+'"?'))return;const cat=loadCat();delete cat[m];saveCat(cat);renderSettings();showToast('ลบแล้ว');}
 async function addColor(model){
   const inp=document.getElementById('nc-'+model),c=inp.value.trim();if(!c)return;
-  const initStock=parseInt(document.getElementById('ns-'+model)?.value)||0;
-  const cat=loadCat();
-  if(!cat[model].colors.includes(c)){
-    cat[model].colors.push(c);
-    const all=[...new Set(Object.values(cat[model].prices).flat())];
-    cat[model].prices[c]=[...all];
-  }
-  saveCat(cat);inp.value='';
-  const nsEl=document.getElementById('ns-'+model);if(nsEl) nsEl.value='';
-  renderSettings();
-  document.getElementById('body-'+model).classList.add('open');
-  // reload fresh data before checking
-  await loadInvFromSB();
   const productName=`${model}-${c}`;
+  // check if already exists
+  await loadInvFromSB();
   const norm=normName(productName);
   const exists=invData.find(i=>i.name_normalized===norm);
-  if(!exists){
-    try{
-      await insertInvToSB({name:productName,name_normalized:norm,main_stock:initStock,defect_stock:0,alert_level:20});
-      if(initStock>0) await logInvTx(productName,'INIT',0,initStock,0,0,initStock,'settings','');
-      await loadInvFromSB();
-      showToast(`เพิ่มสี ${c} + สต็อก ${initStock} ✓`);
-    }catch(e){showToast('เพิ่มสีแล้ว แต่สร้างสต็อกไม่ได้');}
-  } else {
-    showToast('เพิ่มสีแล้ว ✓');
-  }
+  // show initial stock modal
+  showInitStockModal(productName,norm,async(mainStock,defectStock)=>{
+    const cat=loadCat();
+    if(!cat[model].colors.includes(c)){
+      cat[model].colors.push(c);
+      const all=[...new Set(Object.values(cat[model].prices).flat())];
+      cat[model].prices[c]=[...all];
+    }
+    saveCat(cat);inp.value='';renderSettings();
+    document.getElementById('body-'+model).classList.add('open');
+    if(!exists){
+      try{
+        await insertInvToSB({name:productName,name_normalized:norm,main_stock:mainStock,defect_stock:defectStock,alert_level:20});
+        if(mainStock>0||defectStock>0) await logInvTx(productName,'INIT',0,mainStock,0,defectStock,mainStock+defectStock,'settings','');
+        await loadInvFromSB();
+        showToast(`เพิ่ม ${c} + สต็อก Main:${mainStock} Defect:${defectStock} ✓`);
+      }catch(e){
+        // rollback catalog
+        const cat2=loadCat();
+        cat2[model].colors=cat2[model].colors.filter(x=>x!==c);
+        delete cat2[model].prices[c];saveCat(cat2);renderSettings();
+        showToast('เกิดข้อผิดพลาด ยกเลิกการเพิ่มสี');
+      }
+    } else {
+      showToast(`เพิ่มสี ${c} แล้ว (มีในสต็อกแล้ว)`);
+    }
+  });
 }
-function deleteColor(model,c){if(!confirm('ลบสี?'))return;const cat=loadCat();cat[model].colors=cat[model].colors.filter(x=>x!==c);delete cat[model].prices[c];saveCat(cat);renderSettings();document.getElementById('body-'+model).classList.add('open');showToast('ลบสีแล้ว');}
+
+function showInitStockModal(productName,norm,onConfirm){
+  const ex=document.getElementById('init-stock-modal');if(ex)ex.remove();
+  const modal=document.createElement('div');
+  modal.id='init-stock-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:600;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.innerHTML=`<div style="background:#fff;border-radius:var(--r);padding:1.5rem;width:100%;max-width:320px;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+    <div style="font-size:15px;font-weight:700;color:var(--ink);margin-bottom:4px">สต็อกเริ่มต้น</div>
+    <div style="font-size:12px;color:var(--ink3);margin-bottom:1.25rem;padding:6px 10px;background:var(--sf2);border-radius:var(--r)">${productName}</div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:1.25rem">
+      <div class="field"><label>Main Stock</label>
+        <input type="number" id="init-main" value="0" min="0" style="font-size:18px;text-align:center;padding:10px;border:1px solid var(--bd);border-radius:var(--r);font-family:inherit;outline:none;width:100%">
+      </div>
+      <div class="field"><label>Defect Stock (ถ้ามี)</label>
+        <input type="number" id="init-defect" value="0" min="0" style="font-size:18px;text-align:center;padding:10px;border:1px solid var(--bd);border-radius:var(--r);font-family:inherit;outline:none;width:100%">
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button onclick="document.getElementById('init-stock-modal').remove()" style="padding:11px;border:1px solid var(--bd);border-radius:var(--r);background:none;font-size:13px;cursor:pointer;font-family:inherit;color:var(--ink2)">ยกเลิก</button>
+      <button onclick="confirmInitStock()" style="padding:11px;border:none;border-radius:var(--r);background:var(--primary);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">สร้าง</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.onclick=e=>{if(e.target===modal)modal.remove();};
+  // store callback
+  modal._onConfirm=onConfirm;
+  setTimeout(()=>document.getElementById('init-main')?.focus(),100);
+}
+
+function confirmInitStock(){
+  const modal=document.getElementById('init-stock-modal');if(!modal)return;
+  const mainStock=parseInt(document.getElementById('init-main')?.value)||0;
+  const defectStock=parseInt(document.getElementById('init-defect')?.value)||0;
+  const cb=modal._onConfirm;
+  modal.remove();
+  if(cb) cb(mainStock,defectStock);
+}
+function deleteColor(model,c){
+  const productName=`${model}-${c}`;
+  const norm=normName(productName);
+  const invItem=invData.find(i=>i.name_normalized===norm);
+  showDeleteProductModal(productName,invItem,async(deleteInv)=>{
+    // delete from catalog
+    const cat=loadCat();
+    cat[model].colors=cat[model].colors.filter(x=>x!==c);
+    delete cat[model].prices[c];
+    saveCat(cat);renderSettings();
+    document.getElementById('body-'+model)?.classList.add('open');
+    // delete from inventory if checked
+    if(deleteInv&&invItem){
+      try{
+        await sbFetch(`/rest/v1/inventory?id=eq.${invItem.id}`,{method:'DELETE'});
+        invData=invData.filter(i=>i.id!==invItem.id);
+        showToast('ลบสีและสต็อกแล้ว ✓');
+      }catch(e){showToast('ลบสีแล้ว แต่ลบสต็อกไม่ได้');}
+    } else {
+      showToast('ลบสีแล้ว ✓');
+    }
+  });
+}
+
+function showDeleteProductModal(productName,invItem,onConfirm){
+  const ex=document.getElementById('del-prod-modal');if(ex)ex.remove();
+  const hasStock=invItem&&(invItem.main_stock>0||invItem.defect_stock>0);
+  const modal=document.createElement('div');
+  modal.id='del-prod-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:600;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.innerHTML=`<div style="background:#fff;border-radius:var(--r);padding:1.5rem;width:100%;max-width:320px;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+    <div style="font-size:15px;font-weight:700;color:var(--err);margin-bottom:8px">ลบสินค้า</div>
+    <div style="font-size:13px;color:var(--ink);margin-bottom:12px">
+      <b>${productName}</b>
+      ${invItem?`<span style="font-size:11px;color:var(--ink3);display:block;margin-top:4px">มีในสต็อก: Main ${invItem.main_stock}, Defect ${invItem.defect_stock}</span>`:''}
+    </div>
+    ${hasStock?`<div style="font-size:12px;color:var(--err);background:var(--err-bg);padding:8px 10px;border-radius:var(--r);margin-bottom:12px">⚠ สินค้านี้ยังมีสต็อกอยู่ กรุณาตรวจสอบก่อนลบ</div>`:''}
+    ${invItem?`<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink2);margin-bottom:1.25rem;cursor:pointer">
+      <input type="checkbox" id="del-inv-check" style="width:16px;height:16px;cursor:pointer">
+      ลบออกจากสต็อกด้วย
+    </label>`:`<div style="height:.75rem"></div>`}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button onclick="document.getElementById('del-prod-modal').remove()" style="padding:11px;border:1px solid var(--bd);border-radius:var(--r);background:none;font-size:13px;cursor:pointer;font-family:inherit;color:var(--ink2)">ยกเลิก</button>
+      <button onclick="confirmDeleteProduct()" style="padding:11px;border:none;border-radius:var(--r);background:var(--err);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">ลบ</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.onclick=e=>{if(e.target===modal)modal.remove();};
+  modal._onConfirm=onConfirm;
+}
+
+function confirmDeleteProduct(){
+  const modal=document.getElementById('del-prod-modal');if(!modal)return;
+  const deleteInv=document.getElementById('del-inv-check')?.checked||false;
+  const cb=modal._onConfirm;
+  modal.remove();
+  if(cb) cb(deleteInv);
+}
 function addPrice(model){const inp=document.getElementById('np-'+model),p=parseInt(inp.value);if(!p)return;const cat=loadCat();cat[model].colors.forEach(c=>{if(!cat[model].prices[c])cat[model].prices[c]=[];if(!cat[model].prices[c].includes(p)){cat[model].prices[c].push(p);cat[model].prices[c].sort((a,b)=>b-a);}});saveCat(cat);inp.value='';renderSettings();document.getElementById('body-'+model).classList.add('open');showToast('เพิ่มราคาแล้ว');}
 function deletePrice(model,p){const cat=loadCat();cat[model].colors.forEach(c=>{if(cat[model].prices[c])cat[model].prices[c]=cat[model].prices[c].filter(x=>x!==p);});saveCat(cat);renderSettings();document.getElementById('body-'+model).classList.add('open');showToast('ลบราคาแล้ว');}
 
@@ -2012,13 +2114,13 @@ function switchStockView(v){
   const mainBtn=document.getElementById('sv-main-btn');
   const defBtn=document.getElementById('sv-defect-btn');
   if(mainBtn){
-    mainBtn.style.background=v==='main'?'var(--ink)':'var(--bg)';
-    mainBtn.style.color=v==='main'?'var(--sf)':'var(--ink2)';
+    mainBtn.style.background=v==='main'?'var(--primary)':'var(--sf2)';
+    mainBtn.style.color=v==='main'?'#fff':'var(--ink2)';
     mainBtn.style.fontWeight=v==='main'?'700':'500';
   }
   if(defBtn){
-    defBtn.style.background=v==='defect'?'var(--ink)':'var(--bg)';
-    defBtn.style.color=v==='defect'?'var(--sf)':'var(--ink2)';
+    defBtn.style.background=v==='defect'?'var(--primary)':'var(--sf2)';
+    defBtn.style.color=v==='defect'?'#fff':'var(--ink2)';
     defBtn.style.fontWeight=v==='defect'?'700':'500';
   }
   renderStock();
