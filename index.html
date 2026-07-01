@@ -405,6 +405,17 @@ select:disabled{opacity:.35;cursor:not-allowed}
         <input type="number" id="discount-input" placeholder="0" oninput="calcNet()" min="0">
       </div>
     </div>
+    <div class="section">
+      <div class="sec-title">หมายเหตุและที่อยู่ (ไม่บังคับ)</div>
+      <div class="field" style="margin-bottom:10px">
+        <label>หมายเหตุ</label>
+        <input type="text" id="note-input" placeholder="เช่น ลูกค้า VIP, ฝากส่ง, แพ็คพิเศษ">
+      </div>
+      <div class="field">
+        <label>ที่อยู่จัดส่ง</label>
+        <textarea id="address-input" placeholder="ที่อยู่สำหรับจัดส่ง" rows="3" style="width:100%;padding:9px 11px;border:1px solid var(--bd);border-radius:var(--r);font-size:14px;font-family:inherit;outline:none;resize:vertical"></textarea>
+      </div>
+    </div>
     <div class="section" id="summary-section" style="display:none">
       <div class="sec-title">สรุป</div>
       <div class="sum-row"><span class="sl">แหล่งสต็อก</span><span class="sv" id="sum-stock-src"></span></div>
@@ -414,6 +425,7 @@ select:disabled{opacity:.35;cursor:not-allowed}
       <div class="sum-row"><span class="sl">จำนวน</span><span class="sv" id="sum-qty"></span></div>
       <div class="sum-row"><span class="sl">ราคา/ชิ้น</span><span class="sv" id="sum-price"></span></div>
       <div class="sum-row"><span class="sl">ส่วนลดรวม</span><span class="sv" id="sum-discount"></span></div>
+      <div class="sum-row"><span class="sl">หมายเหตุ</span><span class="sv" id="sum-note" style="color:var(--ink3)">—</span></div>
       <div class="sum-row"><span class="sl">ได้รับจริง</span><span class="sv net" id="sum-net"></span></div>
     </div>
     <button class="btn-primary" id="btn-save" onclick="saveEntry()" disabled>บันทึก</button>
@@ -1222,6 +1234,9 @@ function calcNet(){
   document.getElementById('sum-price').textContent='฿'+selPr.toLocaleString();
   document.getElementById('sum-discount').textContent=td>0?`−฿${td.toLocaleString()}`:'-';
   document.getElementById('sum-net').textContent='฿'+net.toLocaleString();
+  const noteVal=document.getElementById('note-input').value.trim();
+  document.getElementById('sum-note').textContent=noteVal||'—';
+  document.getElementById('sum-note').style.color=noteVal?'var(--ink)':'var(--ink3)';
   document.getElementById('summary-section').style.display='';document.getElementById('btn-save').disabled=false;
 }
 function saveEntry(){
@@ -1230,9 +1245,11 @@ function saveEntry(){
   const ed=parseInt(document.getElementById('discount-input').value)||0;
   const cat=loadCat(),bp=cat[model]?.basePrice||selPr;
   const td=(bp-selPr)*selQty+ed,net=selPr*selQty-ed;
+  const note=document.getElementById('note-input').value.trim();
+  const address=document.getElementById('address-input').value.trim();
   const id=Date.now();
   const ents=loadEnt();
-  ents.push({id,date,model,color,channel:selCh,price:selPr,basePrice:bp,qty:selQty,discPerUnit:bp-selPr,extraDisc:ed,totalDisc:td,net,order,custName,stockSrc:selStockSource});
+  ents.push({id,date,model,color,channel:selCh,price:selPr,basePrice:bp,qty:selQty,discPerUnit:bp-selPr,extraDisc:ed,totalDisc:td,net,order,custName,stockSrc:selStockSource,note,address});
   saveEnt(ents);
   const del=loadDel();del[id]={status:'prep',scheduledDate:''};saveDel(del);
   // ตัดสต็อกสินค้าหลัก
@@ -1302,6 +1319,7 @@ function renderHistory(){
         <span class="emeta">${fmtDate(e.date)} · ${e.channel}</span>
         ${ao?`<span class="eorder">📦 ${ao}</span>`:''}
         ${e.custName?`<span class="eorder">✏ ${e.custName}</span>`:''}
+        ${e.note?`<span class="emeta" style="color:var(--ink3);font-style:italic">💬 ${e.note}</span>`:''}
       </div>
       <div class="er"><span class="eprice">฿${e.net.toLocaleString()}</span>
         <button class="btn-del" onclick="deleteEntry(${e.id})">✕</button></div>
@@ -1386,6 +1404,8 @@ function renderDelivery(){
         <div class="d-info">
           <span class="d-prod">${e.model} – ${e.color} ×${e.qty||1}${e.custName?' · '+e.custName:''}</span>
           <span class="d-meta">${fmtDate(e.date)} · ${e.channel}${e.order?' · '+e.order:''}</span>
+          ${e.note?`<span class="d-meta" style="color:var(--ink3);font-style:italic">💬 ${e.note}</span>`:''}
+          ${e.address?`<span class="d-meta" style="color:var(--primary);cursor:pointer;font-weight:600" onclick="showAddressPopup(${e.id})">📍 ดูที่อยู่</span>`:'<span class="d-meta" style="color:var(--ink3)">ไม่มีที่อยู่</span>'}
         </div>
         <div class="d-actions">
           <span class="status-badge ${sc}">${st}</span>
@@ -1981,6 +2001,7 @@ function resetEntryForm(){
   document.getElementById('color-select').innerHTML='<option value="">-- เลือก --</option>';
   document.getElementById('color-select').disabled=true;
   document.getElementById('order-input').value='';document.getElementById('discount-input').value='';
+  document.getElementById('note-input').value='';document.getElementById('address-input').value='';
   document.getElementById('cust-name-input').value='';document.getElementById('name-counter').textContent='';document.getElementById('name-letters').innerHTML='';
   document.getElementById('price-chips').innerHTML='<span style="font-size:12px;color:var(--ink3)">เลือก Model และ Color ก่อน</span>';
   document.getElementById('discount-row').style.display='none';document.getElementById('summary-section').style.display='none';document.getElementById('btn-save').disabled=true;
@@ -2847,25 +2868,45 @@ function generateSummaryImage(){
     }).catch(function(){ce.style.display='none';showToast('เกิดข้อผิดพลาด');});
   },200);
 }
-function renderProdImgList(){
-  var list=loadProdImgs();
-  var el=document.getElementById('prod-img-list');if(!el)return;
-  if(!list.length){el.innerHTML='<div style="font-size:12px;color:var(--ink3);margin-bottom:8px">\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e21\u0e35\u0e23\u0e39\u0e1b\u0e2a\u0e34\u0e19\u0e04\u0e49\u0e32</div>';return;}
-  el.innerHTML=list.map(function(p,i){
-    var src=p.b64?'data:image/jpeg;base64,'+p.b64:'';
-    var imgHtml=src?('<img src="'+src+'" style="width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0">'):'<div style="width:48px;height:48px;border-radius:6px;background:var(--bd);flex-shrink:0"></div>';
-    return '<div style="display:flex;gap:10px;align-items:center;padding:8px;background:var(--sf2);border-radius:var(--r);margin-bottom:6px;border:1px solid var(--bd)">'+imgHtml+'<div style="flex:1"><div style="font-size:13px;font-weight:600">'+p.model+'</div><div style="font-size:12px;color:var(--ink3)">'+p.color+'</div></div><button class="btn-del" onclick="deleteProdImg('+i+')">\u0e25\u0e1a</button></div>';
-  }).join('');
+function showAddressPopup(id){
+  const e=loadEnt().find(x=>x.id===id);if(!e||!e.address)return;
+  const ex=document.getElementById('addr-modal');if(ex)ex.remove();
+  const modal=document.createElement('div');
+  modal.id='addr-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:600;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.innerHTML='<div style="background:var(--sf);border-radius:var(--r);padding:1.5rem;width:100%;max-width:340px;box-shadow:0 8px 32px rgba(0,0,0,.2)">'
+    +'<div style="font-size:14px;font-weight:700;color:var(--ink);margin-bottom:4px">📍 ที่อยู่จัดส่ง</div>'
+    +'<div style="font-size:12px;color:var(--ink3);margin-bottom:12px">'+(e.custName||'')+' · '+fmtDate(e.date)+'</div>'
+    +'<div style="font-size:14px;color:var(--ink);line-height:1.6;padding:12px;background:var(--sf2);border-radius:var(--r);white-space:pre-wrap;margin-bottom:12px">'+e.address+'</div>'
+    +'<div style="display:flex;gap:8px">'
+    +'<button onclick="navigator.clipboard&&navigator.clipboard.writeText(\''+e.address.replace(/'/g,"\\'")+'\')" style="flex:1;padding:10px;border:1px solid var(--bd);border-radius:var(--r);background:none;font-size:13px;cursor:pointer;font-family:inherit">คัดลอก</button>'
+    +'<button onclick="document.getElementById(\'addr-modal\').remove()" style="flex:1;padding:10px;border:none;border-radius:var(--r);background:var(--primary);color:white;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">ปิด</button>'
+    +'</div></div>';
+  document.body.appendChild(modal);
+  modal.onclick=function(ev){if(ev.target===modal)modal.remove();};
 }
+
 function previewNewProdImg(input){
   var file=input.files[0];if(!file)return;
   var reader=new FileReader();
   reader.onload=function(e){
-    newProdImgB64=e.target.result.split(',')[1];
-    var show=document.getElementById('new-prod-img-show');
-    var icon=document.getElementById('new-prod-img-icon');
-    show.src=e.target.result;show.style.display='block';
-    if(icon)icon.style.display='none';
+    var img=new Image();
+    img.onload=function(){
+      var canvas=document.createElement('canvas');
+      var maxSize=400;
+      var w=img.width,h=img.height;
+      if(w>h){if(w>maxSize){h=Math.round(h*maxSize/w);w=maxSize;}}
+      else{if(h>maxSize){w=Math.round(w*maxSize/h);h=maxSize;}}
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      newProdImgB64=canvas.toDataURL('image/jpeg',0.75).split(',')[1];
+      var show=document.getElementById('new-prod-img-show');
+      var icon=document.getElementById('new-prod-img-icon');
+      show.src='data:image/jpeg;base64,'+newProdImgB64;
+      show.style.display='block';
+      if(icon)icon.style.display='none';
+    };
+    img.src=e.target.result;
   };
   reader.readAsDataURL(file);
 }
@@ -2894,11 +2935,23 @@ function previewPayQR(input){
   var file=input.files[0];if(!file)return;
   var reader=new FileReader();
   reader.onload=function(e){
-    newPayQrB64=e.target.result.split(',')[1];
-    var show=document.getElementById('pay-qr-show');
-    var icon=document.getElementById('pay-qr-icon');
-    show.src=e.target.result;show.style.display='block';
-    if(icon)icon.style.display='none';
+    var img=new Image();
+    img.onload=function(){
+      var canvas=document.createElement('canvas');
+      var maxSize=500;
+      var w=img.width,h=img.height;
+      if(w>maxSize){h=Math.round(h*maxSize/w);w=maxSize;}
+      if(h>maxSize){w=Math.round(w*maxSize/h);h=maxSize;}
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      newPayQrB64=canvas.toDataURL('image/jpeg',0.85).split(',')[1];
+      var show=document.getElementById('pay-qr-show');
+      var icon=document.getElementById('pay-qr-icon');
+      show.src='data:image/jpeg;base64,'+newPayQrB64;
+      show.style.display='block';
+      if(icon)icon.style.display='none';
+    };
+    img.src=e.target.result;
   };
   reader.readAsDataURL(file);
 }
