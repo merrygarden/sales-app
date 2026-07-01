@@ -1884,6 +1884,8 @@ function loadSettingsUI(){
   sel.innerHTML='';
   for(let i=-2;i<=9;i++){const d=new Date(now.getFullYear(),now.getMonth()+i,1),val=d.getFullYear()+'-'+(String(d.getMonth()+1).padStart(2,'0'));if(goals[val])continue;const o=document.createElement('option');o.value=val;o.textContent=TH[d.getMonth()+1]+' '+d.getFullYear();sel.appendChild(o);}
   renderGoalSettings();renderSettings();
+  renderProdImgList();
+  loadPaySettingsUI();
 }
 function saveGlobalSettings(){const gs=loadGS();gs.salesperson=document.getElementById('setting-salesperson').value.trim();saveGS(gs);showToast('บันทึกแล้ว ✓');}
 function addGoal(){
@@ -2998,13 +3000,7 @@ function savePaymentSettings(){
   showToast('บันทึกข้อมูลบัญชีแล้ว ✓');
 }
 
-// ── HOOK INTO loadSettingsUI ──
-const _origLoadSettingsUI=typeof loadSettingsUI==='function'?loadSettingsUI:null;
-function loadSettingsUI(){
-  if(_origLoadSettingsUI) _origLoadSettingsUI();
-  renderProdImgList();
-  loadPaySettingsUI();
-}
+// ── HOOK INTO loadSettingsUI — merged above ──
 
 
   const banner=document.getElementById('dash-forecast-banner');
