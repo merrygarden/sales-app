@@ -761,19 +761,18 @@ select:disabled{opacity:.35;cursor:not-allowed}
 <div class="page" id="nav-summary">
   <div class="section">
     <div class="sec-title">สินค้า</div>
-    <div style="display:flex;gap:12px;align-items:center;margin-bottom:14px">
-      <div onclick="document.getElementById('cs-img-pick').click()" style="width:80px;height:80px;border-radius:10px;border:1px solid var(--bd);background:var(--sf2);flex-shrink:0;overflow:hidden;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:28px">
-        <img id="cs-img" src="" alt="" style="width:100%;height:100%;object-fit:cover;display:none">
-        <span id="cs-img-icon">📷</span>
-        <input type="file" id="cs-img-pick" accept="image/*" style="display:none" onchange="onCsImgPick(this)">
-      </div>
-      <div style="flex:1">
-        <div id="cs-prod-name" style="font-size:16px;font-weight:700;color:var(--ink);margin-bottom:4px">—</div>
-        <div id="cs-prod-color" style="font-size:13px;color:var(--ink3);margin-bottom:8px">กดรูปเพื่อเลือกสินค้า</div>
-        <div class="field" style="margin:0"><label>ชื่อลูกค้า</label>
-          <input type="text" id="cs-name" placeholder="ชื่อ-นามสกุล" style="font-size:15px">
+    <div id="cs-prod-gallery" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px"></div>
+    <div id="cs-selected-prod" style="display:none;padding:10px;background:var(--sf2);border-radius:var(--r);border:1px solid var(--bd);margin-bottom:14px">
+      <div style="display:flex;gap:10px;align-items:center">
+        <img id="cs-img" style="width:64px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0">
+        <div>
+          <div id="cs-prod-name" style="font-size:16px;font-weight:700;color:var(--ink)">—</div>
+          <div id="cs-prod-color" style="font-size:13px;color:var(--ink3)"></div>
         </div>
       </div>
+    </div>
+    <div class="field"><label>ชื่อลูกค้า</label>
+      <input type="text" id="cs-name" placeholder="ชื่อ-นามสกุล" style="font-size:15px">
     </div>
   </div>
 
@@ -2788,6 +2787,39 @@ function renderCustomerSummary(){
   if(pay.qrB64){qrImg.src='data:image/jpeg;base64,'+pay.qrB64;qrImg.style.display='block';qrEmpty.style.display='none';}
   else{qrImg.style.display='none';qrEmpty.style.display='block';}
   renderCsPriceChips();
+  // render product gallery
+  var list=loadProdImgs();
+  var gallery=document.getElementById('cs-prod-gallery');
+  if(!gallery)return;
+  if(!list.length){
+    gallery.innerHTML='<div style="font-size:13px;color:var(--ink3)">ยังไม่มีรูปสินค้า — ไปเพิ่มที่ ตั้งค่า</div>';
+    return;
+  }
+  gallery.innerHTML=list.map(function(p,i){
+    var src=p.b64?'data:image/jpeg;base64,'+p.b64:'';
+    return '<div onclick="selectCsProd('+i+')" style="cursor:pointer;text-align:center;width:80px">'
+      +(src?'<img src="'+src+'" style="width:72px;height:72px;object-fit:cover;border-radius:10px;border:2px solid var(--bd);display:block;margin:0 auto 4px">':'<div style="width:72px;height:72px;border-radius:10px;border:2px solid var(--bd);background:var(--sf2);margin:0 auto 4px"></div>')
+      +'<div style="font-size:10px;color:var(--ink2);line-height:1.2">'+p.model+'<br>'+p.color+'</div>'
+      +'</div>';
+  }).join('');
+}
+
+function selectCsProd(i){
+  var list=loadProdImgs();
+  var p=list[i];if(!p)return;
+  // highlight selected
+  var gallery=document.getElementById('cs-prod-gallery');
+  gallery.querySelectorAll('div[onclick]').forEach(function(el,j){
+    el.querySelector('img,div').style.borderColor=j===i?'var(--primary)':'var(--bd)';
+  });
+  // show selected
+  var selDiv=document.getElementById('cs-selected-prod');
+  var csImg=document.getElementById('cs-img');
+  selDiv.style.display='block';
+  csImg.src=p.b64?'data:image/jpeg;base64,'+p.b64:'';
+  csImg._model=p.model;csImg._color=p.color;
+  document.getElementById('cs-prod-name').textContent=p.model||'—';
+  document.getElementById('cs-prod-color').textContent=p.color||'';
 }
 function renderCsPriceChips(){
   var cat=loadCat();var prices=[];
