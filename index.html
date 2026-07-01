@@ -330,6 +330,7 @@ select:disabled{opacity:.35;cursor:not-allowed}
   <button class="nav-tab" onclick="switchNav('inventory')">สต็อก</button>
   <button class="nav-tab" onclick="switchNav('expense')">ค่าใช้จ่าย</button>
   <button class="nav-tab" onclick="switchNav('dashboard')">Dashboard</button>
+  <button class="nav-tab" onclick="switchNav('summary')">สรุปยอด</button>
   <button class="nav-tab" onclick="switchNav('cfg')">ตั้งค่า</button>
   <button class="nav-tab" onclick="syncFromSupabase()" style="margin-left:auto;color:var(--matcha);font-weight:700">↻ Sync</button>
   <button class="nav-tab" onclick="doLogout()" style="color:var(--err);font-weight:600">ออก</button>
@@ -705,6 +706,111 @@ select:disabled{opacity:.35;cursor:not-allowed}
     <div id="model-list"></div>
     <div class="new-model-row"><input type="text" id="new-model-input" placeholder="ชื่อ Model ใหม่"><button class="btn-add" onclick="addModel()">+ เพิ่ม</button></div>
   </div>
+
+  <div class="section">
+    <div class="sec-title">รูปสินค้า (สำหรับสรุปยอด)</div>
+    <p style="font-size:12px;color:var(--ink3);margin-bottom:12px">อัปโหลดรูปพร้อมระบุ Model+สี ระบบจะจับคู่อัตโนมัติ</p>
+    <div id="prod-img-list" style="margin-bottom:10px"></div>
+    <div style="padding:12px;background:var(--sf2);border-radius:var(--r);border:1px solid var(--bd)">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+        <div onclick="document.getElementById('new-prod-img-file').click()" style="width:56px;height:56px;border-radius:8px;border:1px dashed var(--bd);background:white;flex-shrink:0;overflow:hidden;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:22px">
+          <img id="new-prod-img-show" style="display:none;width:100%;height:100%;object-fit:cover">
+          <span id="new-prod-img-icon">📷</span>
+          <input type="file" id="new-prod-img-file" accept="image/*" style="display:none" onchange="previewNewProdImg(this)">
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+          <input type="text" id="new-prod-model" placeholder="Model เช่น City" style="font-size:13px">
+          <input type="text" id="new-prod-color" placeholder="สี เช่น Red Velvet" style="font-size:13px">
+        </div>
+      </div>
+      <button class="btn-add" style="width:100%;padding:9px;text-align:center" onclick="addProdImg()">+ เพิ่มรูปสินค้า</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sec-title">บัญชีธนาคารและ QR Code</div>
+    <div class="field" style="margin-bottom:10px"><label>ชื่อบัญชี</label>
+      <input type="text" id="pay-bank-name" placeholder="ชื่อ-นามสกุล" style="font-size:15px">
+    </div>
+    <div class="field" style="margin-bottom:10px"><label>เลขบัญชี</label>
+      <input type="text" id="pay-bank-num" placeholder="xxx-x-xxxxx-x" style="font-size:15px">
+    </div>
+    <div class="field" style="margin-bottom:10px"><label>QR Code (กดเพื่ออัปโหลด)</label>
+      <div onclick="document.getElementById('pay-qr-file').click()" style="margin-top:6px;width:140px;height:140px;border-radius:8px;border:1px dashed var(--bd);background:var(--sf2);cursor:pointer;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:40px">
+        <img id="pay-qr-show" style="display:none;width:100%;height:100%;object-fit:cover">
+        <span id="pay-qr-icon">📲</span>
+      </div>
+      <input type="file" id="pay-qr-file" accept="image/*" style="display:none" onchange="previewPayQR(this)">
+    </div>
+    <button class="btn-primary" style="margin-top:.5rem" onclick="savePaymentSettings()">บันทึกข้อมูลบัญชี</button>
+  </div>
+</div>
+
+<div class="page" id="nav-summary">
+  <div class="section">
+    <div class="sec-title">สินค้า</div>
+    <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:14px">
+      <div onclick="document.getElementById('cs-img-pick').click()" style="width:72px;height:72px;border-radius:8px;border:1px solid var(--bd);background:var(--sf2);flex-shrink:0;overflow:hidden;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:26px">
+        <img id="cs-img" src="" alt="" style="width:100%;height:100%;object-fit:cover;display:none">
+        <span id="cs-img-icon">📷</span>
+        <input type="file" id="cs-img-pick" accept="image/*" style="display:none" onchange="onCsImgPick(this)">
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+        <div class="field" style="margin:0"><label>รุ่น</label>
+          <input type="text" id="cs-model" placeholder="Model" style="font-size:15px">
+        </div>
+        <div class="field" style="margin:0"><label>สี</label>
+          <input type="text" id="cs-color" placeholder="Color" style="font-size:15px">
+        </div>
+      </div>
+    </div>
+    <div class="field"><label>ชื่อลูกค้า</label>
+      <input type="text" id="cs-name" placeholder="ชื่อ-นามสกุล" style="font-size:16px">
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sec-title">ราคา</div>
+    <div id="cs-price-chips" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px"></div>
+    <div class="field"><label>กรอกราคาเอง</label>
+      <input type="number" id="cs-custom-price" placeholder="0" oninput="csUpdateTotal()" style="font-size:18px;font-weight:600">
+    </div>
+    <div style="font-size:16px;font-weight:700;color:var(--matcha);margin-top:8px">ยอดรวม: <span id="cs-total">฿—</span></div>
+  </div>
+
+  <div class="section">
+    <div class="sec-title">ชำระเงิน</div>
+    <div id="cs-bank-name" style="font-size:17px;font-weight:700;color:var(--ink);margin-bottom:4px">—</div>
+    <div id="cs-bank-num" style="font-size:20px;font-weight:700;letter-spacing:.1em;color:var(--ink);margin-bottom:14px">—</div>
+    <div id="cs-qr-wrap" style="text-align:center">
+      <img id="cs-qr-img" src="" alt="QR" style="max-width:240px;width:100%;border-radius:8px;display:none">
+      <div id="cs-qr-empty" style="padding:24px;border:1px dashed var(--bd);border-radius:8px;color:var(--ink3);font-size:13px">ยังไม่มี QR — ตั้งค่าที่ ตั้งค่า</div>
+    </div>
+  </div>
+
+  <button class="btn-primary" onclick="generateSummaryImage()">📸 บันทึกเป็นรูป</button>
+
+  <div id="cs-export-area" style="display:none;position:fixed;left:-9999px;top:0;background:white;width:720px;padding:40px;font-family:sans-serif;box-sizing:border-box">
+    <div style="text-align:center;margin-bottom:28px">
+      <div style="font-size:11px;letter-spacing:.2em;color:#9A9A94;margin-bottom:6px">MERRY GARDEN</div>
+      <div style="font-size:22px;font-weight:700;color:#2C2C2A">สรุปยอดสั่งซื้อ</div>
+    </div>
+    <div style="display:flex;gap:20px;align-items:flex-start;margin-bottom:24px">
+      <img id="ce-prod-img" style="width:140px;height:140px;object-fit:cover;border-radius:10px;flex-shrink:0;display:none">
+      <div>
+        <div id="ce-model" style="font-size:20px;font-weight:700;color:#2C2C2A"></div>
+        <div id="ce-color" style="font-size:15px;color:#7A6FA0;margin-bottom:8px"></div>
+        <div id="ce-name" style="font-size:14px;color:#5C5C58"></div>
+        <div id="ce-price" style="font-size:28px;font-weight:700;color:#2C2C2A;margin-top:8px"></div>
+      </div>
+    </div>
+    <div style="border-top:1px solid #D8DDD0;padding-top:20px">
+      <div style="font-size:13px;color:#9A9A94;margin-bottom:6px">โอนเงินมาที่</div>
+      <div id="ce-bank-name" style="font-size:17px;font-weight:600;color:#2C2C2A"></div>
+      <div id="ce-bank-num" style="font-size:22px;font-weight:700;letter-spacing:.12em;color:#2C2C2A;margin-bottom:16px"></div>
+      <img id="ce-qr" style="width:200px;height:200px;display:block;margin:0 auto;border-radius:8px;display:none">
+    </div>
+  </div>
 </div>
 </div><!-- end .main -->
 
@@ -907,14 +1013,17 @@ function genMonthOptions(selId,addAll=true){
 // NAV
 // ═══════════════════════════════════════════════
 function switchNav(n){
-  ['sales','inventory','expense','dashboard','cfg'].forEach((x,i)=>{
-    document.querySelectorAll('.nav-tab')[i].classList.toggle('active',x===n);
-    document.getElementById('nav-'+x).classList.toggle('active',x===n);
+  ['sales','inventory','expense','dashboard','summary','cfg'].forEach(function(x,i){
+    var btn=document.querySelectorAll('.nav-tab')[i];
+    var pg=document.getElementById('nav-'+x);
+    if(btn) btn.classList.toggle('active',x===n);
+    if(pg) pg.classList.toggle('active',x===n);
   });
   if(n==='sales'){genMonthOptions('hist-month');genMonthOptions('info-month');populateInfoChannels();populateHistChannels();populateModels();checkOverdue();}
-  if(n==='inventory'){loadInvFromSB().then(()=>{checkLowStock();renderStock();});}
+  if(n==='inventory'){loadInvFromSB().then(function(){checkLowStock();renderStock();});}
   if(n==='expense'){genMonthOptions('bills-month');genMonthOptions('report-month');renderBills();renderForecastAlerts();}
   if(n==='dashboard'){genMonthOptions('dash-month');renderDashboard();}
+  if(n==='summary'){renderCustomerSummary();}
   if(n==='cfg'){loadSettingsUI();}
 }
 
@@ -1682,6 +1791,8 @@ function loadSettingsUI(){
   sel.innerHTML='';
   for(let i=-2;i<=9;i++){const d=new Date(now.getFullYear(),now.getMonth()+i,1),val=d.getFullYear()+'-'+(String(d.getMonth()+1).padStart(2,'0'));if(goals[val])continue;const o=document.createElement('option');o.value=val;o.textContent=TH[d.getMonth()+1]+' '+d.getFullYear();sel.appendChild(o);}
   renderGoalSettings();renderSettings();
+  renderProdImgList();
+  loadPaySettingsUI();
 }
 function saveGlobalSettings(){const gs=loadGS();gs.salesperson=document.getElementById('setting-salesperson').value.trim();saveGS(gs);showToast('บันทึกแล้ว ✓');}
 function addGoal(){
@@ -2630,6 +2741,187 @@ function exportExpenseCSV(){
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
   a.download=`expense_${mo||'all'}.csv`;a.click();showToast('ดาวน์โหลดแล้ว ✓');
+}
+
+// ── CUSTOMER SUMMARY ──
+var csSelectedPrice=null;
+var newProdImgB64=null;
+var newPayQrB64=null;
+
+function loadProdImgs(){
+  try{return JSON.parse(localStorage.getItem('merry_prodImgs')||'[]');}catch(e){return[];}
+}
+function saveProdImgsLocal(arr){
+  localStorage.setItem('merry_prodImgs',JSON.stringify(arr));
+  sbSetting('prodImgs',arr).catch(function(){});
+}
+function loadPayInfo(){
+  try{return JSON.parse(localStorage.getItem('merry_payInfo')||'{}');}catch(e){return{};}
+}
+function savePayInfoLocal(obj){
+  localStorage.setItem('merry_payInfo',JSON.stringify(obj));
+  sbSetting('payInfo',obj).catch(function(){});
+}
+function renderCustomerSummary(){
+  var pay=loadPayInfo();
+  document.getElementById('cs-bank-name').textContent=pay.bankName||'—';
+  document.getElementById('cs-bank-num').textContent=pay.bankNum||'—';
+  var qrImg=document.getElementById('cs-qr-img');
+  var qrEmpty=document.getElementById('cs-qr-empty');
+  if(pay.qrB64){qrImg.src='data:image/jpeg;base64,'+pay.qrB64;qrImg.style.display='block';qrEmpty.style.display='none';}
+  else{qrImg.style.display='none';qrEmpty.style.display='block';}
+  renderCsPriceChips();
+}
+function renderCsPriceChips(){
+  var cat=loadCat();var prices=[];
+  Object.values(cat).forEach(function(m){
+    if(m.basePrice&&prices.indexOf(m.basePrice)<0) prices.push(m.basePrice);
+    if(m.prices) Object.values(m.prices).forEach(function(arr){arr.forEach(function(p){if(prices.indexOf(p)<0)prices.push(p);});});
+  });
+  prices.sort(function(a,b){return a-b;});
+  var wrap=document.getElementById('cs-price-chips');if(!wrap)return;
+  wrap.innerHTML=prices.map(function(p){
+    return '<button class="price-chip '+(csSelectedPrice===p?'active':'')+'" onclick="csSelectPrice('+p+')">\u0e3f'+p.toLocaleString()+'</button>';
+  }).join('');
+}
+function csSelectPrice(p){
+  csSelectedPrice=p;
+  document.getElementById('cs-custom-price').value='';
+  renderCsPriceChips();csUpdateTotal();
+}
+function csUpdateTotal(){
+  var custom=parseInt(document.getElementById('cs-custom-price').value)||0;
+  var price=custom||csSelectedPrice;
+  document.getElementById('cs-total').textContent=price?'\u0e3f'+price.toLocaleString():'\u0e3f—';
+}
+function onCsImgPick(input){
+  var file=input.files[0];if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var img=document.getElementById('cs-img');
+    var icon=document.getElementById('cs-img-icon');
+    img.src=e.target.result;img.style.display='block';icon.style.display='none';
+    var b64=e.target.result.split(',')[1];
+    var list=loadProdImgs();
+    for(var i=0;i<list.length;i++){
+      if(list[i].b64===b64){
+        document.getElementById('cs-model').value=list[i].model||'';
+        document.getElementById('cs-color').value=list[i].color||'';
+        break;
+      }
+    }
+  };
+  reader.readAsDataURL(file);
+}
+function generateSummaryImage(){
+  var model=document.getElementById('cs-model').value.trim();
+  var color=document.getElementById('cs-color').value.trim();
+  var name=document.getElementById('cs-name').value.trim();
+  var custom=parseInt(document.getElementById('cs-custom-price').value)||0;
+  var price=custom||csSelectedPrice;
+  if(!price){showToast('กรุณาเลือกหรือกรอกราคาก่อน');return;}
+  var pay=loadPayInfo();
+  var ce=document.getElementById('cs-export-area');
+  ce.style.display='block';
+  document.getElementById('ce-model').textContent=model||'—';
+  document.getElementById('ce-color').textContent=color||'';
+  document.getElementById('ce-name').textContent=name?'ลูกค้า: '+name:'';
+  document.getElementById('ce-price').textContent='\u0e3f'+price.toLocaleString();
+  document.getElementById('ce-bank-name').textContent=pay.bankName||'—';
+  document.getElementById('ce-bank-num').textContent=pay.bankNum||'—';
+  var csImg=document.getElementById('cs-img');
+  var ceProdImg=document.getElementById('ce-prod-img');
+  if(csImg.src&&csImg.src.length>10){ceProdImg.src=csImg.src;ceProdImg.style.display='block';}
+  else{ceProdImg.style.display='none';}
+  var ceQr=document.getElementById('ce-qr');
+  if(pay.qrB64){ceQr.src='data:image/jpeg;base64,'+pay.qrB64;ceQr.style.display='block';}
+  else{ceQr.style.display='none';}
+  setTimeout(function(){
+    if(typeof html2canvas==='undefined'){showToast('กรุณาเปิดผ่าน GitHub');ce.style.display='none';return;}
+    html2canvas(ce,{scale:2,useCORS:true,backgroundColor:'#ffffff'}).then(function(canvas){
+      ce.style.display='none';
+      var a=document.createElement('a');
+      a.href=canvas.toDataURL('image/jpeg',0.92);
+      a.download='summary_'+Date.now()+'.jpg';
+      a.click();showToast('บันทึกรูปแล้ว \u2713');
+    }).catch(function(){ce.style.display='none';showToast('เกิดข้อผิดพลาด');});
+  },200);
+}
+function renderProdImgList(){
+  var list=loadProdImgs();
+  var el=document.getElementById('prod-img-list');if(!el)return;
+  if(!list.length){el.innerHTML='<div style="font-size:12px;color:var(--ink3);margin-bottom:8px">\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e21\u0e35\u0e23\u0e39\u0e1b\u0e2a\u0e34\u0e19\u0e04\u0e49\u0e32</div>';return;}
+  el.innerHTML=list.map(function(p,i){
+    var src=p.b64?'data:image/jpeg;base64,'+p.b64:'';
+    var imgHtml=src?('<img src="'+src+'" style="width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0">'):'<div style="width:48px;height:48px;border-radius:6px;background:var(--bd);flex-shrink:0"></div>';
+    return '<div style="display:flex;gap:10px;align-items:center;padding:8px;background:var(--sf2);border-radius:var(--r);margin-bottom:6px;border:1px solid var(--bd)">'+imgHtml+'<div style="flex:1"><div style="font-size:13px;font-weight:600">'+p.model+'</div><div style="font-size:12px;color:var(--ink3)">'+p.color+'</div></div><button class="btn-del" onclick="deleteProdImg('+i+')">\u0e25\u0e1a</button></div>';
+  }).join('');
+}
+function previewNewProdImg(input){
+  var file=input.files[0];if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    newProdImgB64=e.target.result.split(',')[1];
+    var show=document.getElementById('new-prod-img-show');
+    var icon=document.getElementById('new-prod-img-icon');
+    show.src=e.target.result;show.style.display='block';
+    if(icon)icon.style.display='none';
+  };
+  reader.readAsDataURL(file);
+}
+function addProdImg(){
+  var model=document.getElementById('new-prod-model').value.trim();
+  var color=document.getElementById('new-prod-color').value.trim();
+  if(!model||!newProdImgB64){showToast('\u0e01\u0e23\u0e38\u0e13\u0e32\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e23\u0e39\u0e1b\u0e41\u0e25\u0e30\u0e23\u0e30\u0e1a\u0e38 Model');return;}
+  var list=loadProdImgs();
+  list.push({model:model,color:color,b64:newProdImgB64});
+  saveProdImgsLocal(list);
+  document.getElementById('new-prod-model').value='';
+  document.getElementById('new-prod-color').value='';
+  document.getElementById('new-prod-img-file').value='';
+  var show=document.getElementById('new-prod-img-show');
+  var icon=document.getElementById('new-prod-img-icon');
+  show.style.display='none';if(icon)icon.style.display='block';
+  newProdImgB64=null;
+  renderProdImgList();showToast('\u0e40\u0e1e\u0e34\u0e48\u0e21\u0e23\u0e39\u0e1b\u0e41\u0e25\u0e49\u0e27 \u2713');
+}
+function deleteProdImg(i){
+  if(!confirm('\u0e25\u0e1a\u0e23\u0e39\u0e1b\u0e2a\u0e34\u0e19\u0e04\u0e49\u0e32\u0e19\u0e35\u0e49?'))return;
+  var list=loadProdImgs();list.splice(i,1);
+  saveProdImgsLocal(list);renderProdImgList();showToast('\u0e25\u0e1a\u0e41\u0e25\u0e49\u0e27');
+}
+function previewPayQR(input){
+  var file=input.files[0];if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    newPayQrB64=e.target.result.split(',')[1];
+    var show=document.getElementById('pay-qr-show');
+    var icon=document.getElementById('pay-qr-icon');
+    show.src=e.target.result;show.style.display='block';
+    if(icon)icon.style.display='none';
+  };
+  reader.readAsDataURL(file);
+}
+function loadPaySettingsUI(){
+  var pay=loadPayInfo();
+  var bn=document.getElementById('pay-bank-name');
+  var nn=document.getElementById('pay-bank-num');
+  if(bn)bn.value=pay.bankName||'';
+  if(nn)nn.value=pay.bankNum||'';
+  if(pay.qrB64){
+    var show=document.getElementById('pay-qr-show');
+    var icon=document.getElementById('pay-qr-icon');
+    if(show){show.src='data:image/jpeg;base64,'+pay.qrB64;show.style.display='block';}
+    if(icon)icon.style.display='none';
+  }
+}
+function savePaymentSettings(){
+  var bankName=document.getElementById('pay-bank-name').value.trim();
+  var bankNum=document.getElementById('pay-bank-num').value.trim();
+  var existing=loadPayInfo();
+  var qrB64=newPayQrB64||existing.qrB64||null;
+  savePayInfoLocal({bankName:bankName,bankNum:bankNum,qrB64:qrB64});
+  showToast('\u0e1a\u0e31\u0e19\u0e17\u0e36\u0e01\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e1a\u0e31\u0e0d\u0e0a\u0e35\u0e41\u0e25\u0e49\u0e27 \u2713');
 }
 
 // ── INIT ──
