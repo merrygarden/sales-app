@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Sales & Expense Tracker</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#7A6FA0">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Sales Tracker">
 <style>
 :root{
   --bg:#F2F0E8;--sf:#FAFAF7;--ink:#2C2C2A;--ink2:#5C5C58;--ink3:#9A9A94;
@@ -759,6 +766,16 @@ select:disabled{opacity:.35;cursor:not-allowed}
     </div>
     <button class="btn-primary" style="margin-top:.5rem" onclick="savePaymentSettings()">บันทึกข้อมูลบัญชี</button>
   </div>
+  <div class="section">
+    <div class="sec-title">สำรองข้อมูล / กู้คืน</div>
+    <div style="font-size:12px;color:var(--ink3);margin-bottom:10px">ดาวน์โหลดข้อมูลทั้งหมด (ยอดขาย, สต็อกสินค้า, บิลค่าใช้จ่าย, ตั้งค่า) เก็บไว้เผื่อกู้คืน</div>
+    <button class="btn-primary" onclick="exportFullBackup()">⬇ ดาวน์โหลด Backup ทั้งหมด</button>
+    <div class="upload-box" style="margin-top:10px" onclick="document.getElementById('restore-file').click()">
+      📂 กู้คืนจากไฟล์ Backup (.json)
+      <span style="font-size:11px;display:block;margin-top:3px;color:var(--ink3)">จะเขียนทับข้อมูลปัจจุบันทั้งหมด</span>
+      <input type="file" id="restore-file" accept=".json" style="display:none" onchange="importFullBackup(this)">
+    </div>
+  </div>
 </div>
 
 <div class="page" id="nav-summary">
@@ -917,6 +934,7 @@ const sbFetch=async(path,opts={},retried)=>{
 // ═══════════════════════════════════════════════
 // localStorage ใช้เป็น cache เพื่อให้แอปทำงานได้ offline และเร็ว
 const SK='sales_v3',CK='catalog_v2',GSK='gs_v1',GOALSK='goals_v1',DSK='delivery_v1',BSK='bills_v1',SHOPEESK='shopee_v1';
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}};
 const lsSet=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
 
@@ -1104,8 +1122,9 @@ function switchNav(n){
 }
 
 function switchSalesTab(t){
-  ['entry','history','delivery','info'].forEach((n,i)=>{
-    document.querySelectorAll('#nav-sales .tab')[i].classList.toggle('active',n===t);
+  ['entry','history','delivery','info'].forEach((n)=>{
+    var btn=document.querySelector('#nav-sales .tab[onclick*="switchSalesTab(\'' + n + '\')"]');
+    if(btn) btn.classList.toggle('active',n===t);
     document.getElementById('stab-'+n).classList.toggle('active',n===t);
   });
   if(t==='history'){genMonthOptions('hist-month');populateHistChannels();renderHistory();}
@@ -1115,8 +1134,9 @@ function switchSalesTab(t){
 }
 
 function switchExpTab(t){
-  ['eentry','ebills','ereport'].forEach((n,i)=>{
-    document.querySelectorAll('#nav-expense .tab')[i].classList.toggle('active',n===t);
+  ['eentry','ebills','ereport'].forEach((n)=>{
+    var btn=document.querySelector('#nav-expense .tab[onclick*="switchExpTab(\'' + n + '\')"]');
+    if(btn) btn.classList.toggle('active',n===t);
     document.getElementById('stab-'+n).classList.toggle('active',n===t);
   });
   if(t==='ebills'){genMonthOptions('bills-month');renderBills();renderForecastAlerts();}
@@ -1382,8 +1402,8 @@ function renderHistory(){
         <span class="eprod">${e.model} – ${e.color} ×${e.qty||1}</span>
         <span class="emeta">${fmtDate(e.date)} · ${e.channel}</span>
         ${ao?`<span class="eorder">📦 ${ao}</span>`:''}
-        ${e.custName?`<span class="eorder">✏ ${e.custName}</span>`:''}
-        ${e.note?`<span class="emeta" style="color:var(--ink3);font-style:italic">💬 ${e.note}</span>`:''}
+        ${e.custName?`<span class="eorder">✏ ${esc(e.custName)}</span>`:''}
+        ${e.note?`<span class="emeta" style="color:var(--ink3);font-style:italic">💬 ${esc(e.note)}</span>`:''}
       </div>
       <div class="er"><span class="eprice">฿${e.net.toLocaleString()}</span>
         <button class="btn-del" onclick="deleteEntry(${e.id})">✕</button></div>
@@ -1466,9 +1486,9 @@ function renderDelivery(){
     return`<div class="delivery-row">
       <div class="d-top">
         <div class="d-info">
-          <span class="d-prod">${e.model} – ${e.color} ×${e.qty||1}${e.custName?' · '+e.custName:''}</span>
-          <span class="d-meta">${fmtDate(e.date)} · ${e.channel}${e.order?' · '+e.order:''}</span>
-          ${e.note?`<span class="d-meta" style="color:var(--ink3);font-style:italic">💬 ${e.note}</span>`:''}
+          <span class="d-prod">${esc(e.model)} – ${esc(e.color)} ×${e.qty||1}${e.custName?' · '+esc(e.custName):''}</span>
+          <span class="d-meta">${fmtDate(e.date)} · ${esc(e.channel)}${e.order?' · '+esc(e.order):''}</span>
+          ${e.note?`<span class="d-meta" style="color:var(--ink3);font-style:italic">💬 ${esc(e.note)}</span>`:''}
           ${e.address?`<span class="d-meta" style="color:var(--primary);cursor:pointer;font-weight:600" onclick="showAddressPopup(${e.id})">📍 ดูที่อยู่</span>`:'<span class="d-meta" style="color:var(--ink3)">ไม่มีที่อยู่</span>'}
         </div>
         <div class="d-actions">
@@ -1645,7 +1665,7 @@ function renderBills(){
     return`<div class="bill-card">
       <div class="bill-header" onclick="toggleBill(this)">
         <div class="bill-left">
-          <div class="bill-title">▶ ${b.vendor||'ไม่ระบุ'} <span class="cat-badge cat-${cat.cls}">${cat.cat}</span></div>
+          <div class="bill-title">▶ ${esc(b.vendor||'ไม่ระบุ')} <span class="cat-badge cat-${cat.cls}">${esc(cat.cat)}</span></div>
           <div class="bill-meta">${fmtDate(b.date)} · ${b.items.length} รายการ</div>
         </div>
         <div style="display:flex;align-items:center;gap:6px">
@@ -1685,7 +1705,7 @@ function buildReceiptHTML(bill){
   return`<div style="width:420px;background:#fff;padding:36px 32px;font-family:-apple-system,'Hiragino Sans',sans-serif;color:#1C1C1A">
     <div style="border-bottom:2px solid #1C1C1A;padding-bottom:18px;margin-bottom:22px">
       <div style="font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#9A9A96;margin-bottom:8px">ใบเสร็จรับเงิน / Receipt</div>
-      <div style="font-size:24px;font-weight:600;letter-spacing:.01em">${bill.vendor||'—'}</div>
+      <div style="font-size:24px;font-weight:600;letter-spacing:.01em">${esc(bill.vendor||'—')}</div>
     </div>
     <div style="display:flex;justify-content:space-between;margin-bottom:22px">
       <div><div style="font-size:10px;color:#9A9A96;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">วันที่</div><div style="font-size:14px;font-weight:600">${fmtDate(bill.date)}</div></div>
@@ -1793,7 +1813,7 @@ function renderForecastAlerts(){
   });
   const el=document.getElementById('forecast-alerts');
   el.innerHTML=alerts.map(a=>`<div class="forecast-card">
-    <div class="forecast-title">🔔 ใกล้ถึงเวลาสั่งซื้อ — ${a.vendor}</div>
+    <div class="forecast-title">🔔 ใกล้ถึงเวลาสั่งซื้อ — ${esc(a.vendor)}</div>
     <div style="font-size:12px;color:var(--ink2)">กำหนด ${fmtDate(a.next)} (${a.diff<=0?'เกิน '+(-a.diff)+' วัน':a.diff+' วันข้างหน้า'})</div>
     <div style="font-size:11px;color:var(--ink3);margin-top:2px">${a.items}</div>
   </div>`).join('');
@@ -3015,14 +3035,30 @@ function showAddressPopup(id){
   const modal=document.createElement('div');
   modal.id='addr-modal';
   modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:600;display:flex;align-items:center;justify-content:center;padding:1rem';
-  modal.innerHTML='<div style="background:var(--sf);border-radius:var(--r);padding:1.5rem;width:100%;max-width:340px;box-shadow:0 8px 32px rgba(0,0,0,.2)">'
-    +'<div style="font-size:14px;font-weight:700;color:var(--ink);margin-bottom:4px">📍 ที่อยู่จัดส่ง</div>'
-    +'<div style="font-size:12px;color:var(--ink3);margin-bottom:12px">'+(e.custName||'')+' · '+fmtDate(e.date)+'</div>'
-    +'<div style="font-size:14px;color:var(--ink);line-height:1.6;padding:12px;background:var(--sf2);border-radius:var(--r);white-space:pre-wrap;margin-bottom:12px">'+e.address+'</div>'
-    +'<div style="display:flex;gap:8px">'
-    +'<button onclick="navigator.clipboard&&navigator.clipboard.writeText(\''+e.address.replace(/'/g,"\\'")+'\')" style="flex:1;padding:10px;border:1px solid var(--bd);border-radius:var(--r);background:none;font-size:13px;cursor:pointer;font-family:inherit">คัดลอก</button>'
-    +'<button onclick="document.getElementById(\'addr-modal\').remove()" style="flex:1;padding:10px;border:none;border-radius:var(--r);background:var(--primary);color:white;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">ปิด</button>'
-    +'</div></div>';
+  const card=document.createElement('div');
+  card.style.cssText='background:var(--sf);border-radius:var(--r);padding:1.5rem;width:100%;max-width:340px;box-shadow:0 8px 32px rgba(0,0,0,.2)';
+  const h=document.createElement('div');
+  h.style.cssText='font-size:14px;font-weight:700;color:var(--ink);margin-bottom:4px';
+  h.textContent='📍 ที่อยู่จัดส่ง';
+  const meta=document.createElement('div');
+  meta.style.cssText='font-size:12px;color:var(--ink3);margin-bottom:12px';
+  meta.textContent=(e.custName||'')+' · '+fmtDate(e.date);
+  const addrBox=document.createElement('div');
+  addrBox.style.cssText='font-size:14px;color:var(--ink);line-height:1.6;padding:12px;background:var(--sf2);border-radius:var(--r);white-space:pre-wrap;margin-bottom:12px';
+  addrBox.textContent=e.address;
+  const btnRow=document.createElement('div');
+  btnRow.style.cssText='display:flex;gap:8px';
+  const copyBtn=document.createElement('button');
+  copyBtn.style.cssText='flex:1;padding:10px;border:1px solid var(--bd);border-radius:var(--r);background:none;font-size:13px;cursor:pointer;font-family:inherit';
+  copyBtn.textContent='คัดลอก';
+  copyBtn.addEventListener('click',function(){navigator.clipboard&&navigator.clipboard.writeText(e.address);});
+  const closeBtn=document.createElement('button');
+  closeBtn.style.cssText='flex:1;padding:10px;border:none;border-radius:var(--r);background:var(--primary);color:white;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit';
+  closeBtn.textContent='ปิด';
+  closeBtn.addEventListener('click',function(){modal.remove();});
+  btnRow.appendChild(copyBtn);btnRow.appendChild(closeBtn);
+  card.appendChild(h);card.appendChild(meta);card.appendChild(addrBox);card.appendChild(btnRow);
+  modal.appendChild(card);
   document.body.appendChild(modal);
   modal.onclick=function(ev){if(ev.target===modal)modal.remove();};
 }
@@ -3132,6 +3168,65 @@ function savePaymentSettings(){
   showToast('\u0e1a\u0e31\u0e19\u0e17\u0e36\u0e01\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e1a\u0e31\u0e0d\u0e0a\u0e35\u0e41\u0e25\u0e49\u0e27 \u2713');
 }
 
+function exportFullBackup(){
+  var backup={
+    _app:'merry-garden-sales-tracker',
+    _exportedAt:new Date().toISOString(),
+    entries:loadEnt(),
+    bills:loadBills(),
+    catalog:loadCat(),
+    gs:loadGS(),
+    goals:loadGoals(),
+    delivery:loadDel(),
+    shopee:loadShopeeStored(),
+    prodImgs:loadProdImgs(),
+    payInfo:loadPayInfo()
+  };
+  var blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
+  var a=document.createElement('a');
+  var ts=new Date().toISOString().slice(0,16).replace(/[:T]/g,'-');
+  a.href=URL.createObjectURL(blob);
+  a.download='merry_garden_backup_'+ts+'.json';
+  a.click();
+  showToast('ดาวน์โหลด Backup แล้ว ✓');
+}
+
+function importFullBackup(input){
+  var file=input.files[0];if(!file)return;
+  var reader=new FileReader();
+  reader.onload=async function(e){
+    var data;
+    try{data=JSON.parse(e.target.result);}
+    catch(err){showToast('ไฟล์ไม่ถูกต้อง');input.value='';return;}
+    if(data._app!=='merry-garden-sales-tracker'){
+      if(!confirm('ไฟล์นี้อาจไม่ใช่ Backup ของแอปนี้ ต้องการดำเนินการต่อหรือไม่?')){input.value='';return;}
+    }
+    if(!confirm('การกู้คืนจะเขียนทับข้อมูลปัจจุบันทั้งหมด (ยอดขาย, บิล, ตั้งค่า) ยืนยันหรือไม่?')){input.value='';return;}
+    showToast('กำลังกู้คืนข้อมูล...');
+    try{
+      if(data.entries) await saveEnt(data.entries);
+      if(data.bills) await saveBills(data.bills);
+      if(data.catalog) await saveCat(data.catalog);
+      if(data.gs) await saveGS(data.gs);
+      if(data.goals) await saveGoals(data.goals);
+      if(data.delivery) await saveDel(data.delivery);
+      if(data.shopee) await saveShopeeStored(data.shopee);
+      if(data.prodImgs) saveProdImgsLocal(data.prodImgs);
+      if(data.payInfo) savePayInfoLocal(data.payInfo);
+      showToast('กู้คืนข้อมูลสำเร็จ ✓');
+      genMonthOptions('hist-month');genMonthOptions('info-month');
+      genMonthOptions('bills-month');genMonthOptions('report-month');genMonthOptions('dash-month');
+      populateModels();checkOverdue();renderGoals();
+      loadPaySettingsUI();renderProdImgList();
+      await loadInvFromSB();checkLowStock();
+    }catch(err){
+      showToast('กู้คืนไม่สำเร็จ: '+err.message);
+    }
+    input.value='';
+  };
+  reader.readAsText(file);
+}
+
 // ── INIT ──
 if(localStorage.getItem('sb_session')){
   showApp();
@@ -3139,6 +3234,13 @@ if(localStorage.getItem('sb_session')){
   syncFromSupabase();
 }
 // else: แสดง login page (default)
+
+// ── PWA: register service worker (installable + faster reloads) ──
+if('serviceWorker' in navigator){
+  window.addEventListener('load',function(){
+    navigator.serviceWorker.register('sw.js').catch(function(err){console.warn('SW register failed:',err.message);});
+  });
+}
 </script>
 </body>
 </html>
