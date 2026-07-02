@@ -11,6 +11,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Sales Tracker">
+<script>try{if(localStorage.getItem('darkMode')==='1')document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
 <style>
 :root{
   --bg:#F2F0E8;--sf:#FAFAF7;--ink:#2C2C2A;--ink2:#5C5C58;--ink3:#9A9A94;
@@ -21,9 +22,19 @@
   --sf2:#EEF2E6;
   --primary:#6B7A4A;--primary-dk:#4A5A30;--primary-lt:#EEF2E6;
 }
+html[data-theme="dark"]{
+  --bg:#1C1B20;--sf:#26242C;--ink:#EDEBEF;--ink2:#B8B5C0;--ink3:#7C7986;
+  --kinari:#8A9578;--matcha:#A99CD6;--matcha-lt:#3A3548;
+  --bd:#3A3742;--bd2:#322F38;
+  --warn-bg:#332C4A;--warn:#B6A6EA;--err-bg:#4A2622;--err:#E8877A;
+  --ok-bg:#2A3324;--ok:#9BC47E;--sf2:#2F2C36;
+  --primary:#9AAE72;--primary-dk:#B8C98F;--primary-lt:#2F3628;
+}
+html[data-theme="dark"] body{background:var(--bg);color:var(--ink)}
+html[data-theme="dark"] img{opacity:.92}
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
-body{font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN',-apple-system,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;-webkit-font-smoothing:antialiased;-webkit-overflow-scrolling:touch;overscroll-behavior-y:none}
+body{font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN',-apple-system,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;-webkit-font-smoothing:antialiased;-webkit-overflow-scrolling:touch;overscroll-behavior-y:none;transition:background .25s,color .25s}
 /* ── NAV ── */
 .nav{background:var(--sf);border-bottom:1px solid var(--bd);display:flex;align-items:stretch;padding:0 1rem;position:sticky;top:0;z-index:100}
 .nav-logo{font-size:13px;font-weight:700;letter-spacing:.04em;padding:14px 16px 14px 0;border-right:1px solid var(--bd);margin-right:4px;white-space:nowrap;color:var(--ink)}
@@ -708,6 +719,13 @@ select:disabled{opacity:.35;cursor:not-allowed}
 <!-- ════════════════════ SETTINGS ════════════════════ -->
 <div class="page" id="nav-cfg">
   <div class="section">
+    <div class="sec-title">โหมดกลางคืน</div>
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:13px;color:var(--ink2)">Dark Mode</span>
+      <label class="toggle"><input type="checkbox" id="dark-mode-toggle" onchange="toggleDarkMode()"><span class="toggle-slider"></span></label>
+    </div>
+  </div>
+  <div class="section">
     <div class="sec-title">Export</div>
     <div class="setting-field"><label>พนักงานขาย</label><input type="text" id="setting-salesperson" placeholder="ชื่อ"></div>
     <button class="btn-primary" style="margin-top:0" onclick="saveGlobalSettings()">บันทึก</button>
@@ -873,6 +891,7 @@ select:disabled{opacity:.35;cursor:not-allowed}
 </div><!-- end app-wrap -->
 
 <div class="toast" id="toast"></div>
+<canvas id="confetti-canvas" style="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:999;display:none"></canvas>
 <div id="img-preview-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:2000;flex-direction:column;align-items:center;justify-content:center;padding:1rem">
   <div style="color:#fff;font-size:13px;font-weight:600;margin-bottom:12px;text-align:center">กดค้างที่รูปด้านล่างค้างไว้ แล้วเลือก "บันทึกภาพ" เพื่อเซฟลงคลังภาพ</div>
   <img id="img-preview-img" src="" style="max-width:92vw;max-height:72vh;border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,.5)">
@@ -1335,6 +1354,20 @@ function saveEntry(){
   const address=document.getElementById('address-input').value.trim();
   const id=Date.now();
   const ents=loadEnt();
+  // ── fun stats: snapshot totals BEFORE adding this sale ──
+  const monthKey=date.slice(0,7);
+  const goals=loadGoals();
+  const prevMonthTotal=ents.filter(e=>e.date.startsWith(monthKey)).reduce((s,e)=>s+e.net,0);
+  const prevDayTotal=ents.filter(e=>e.date===date).reduce((s,e)=>s+e.net,0);
+  const dayTotals={};
+  ents.forEach(e=>{dayTotals[e.date]=(dayTotals[e.date]||0)+e.net;});
+  let best7=0;
+  const entryDateObj=new Date(date);
+  for(let i=1;i<=7;i++){
+    const d=new Date(entryDateObj);d.setDate(d.getDate()-i);
+    const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    if(dayTotals[key]) best7=Math.max(best7,dayTotals[key]);
+  }
   ents.push({id,date,model,color,channel:selCh,price:selPr,basePrice:bp,qty:selQty,discPerUnit:bp-selPr,extraDisc:ed,totalDisc:td,net,order,custName,stockSrc:selStockSource,note,address});
   saveEnt(ents);
   const del=loadDel();del[id]={status:'prep',scheduledDate:''};saveDel(del);
@@ -1351,6 +1384,17 @@ function saveEntry(){
   }
   genMonthOptions('hist-month');genMonthOptions('info-month');
   checkOverdue();showToast('บันทึกแล้ว ✓');showCat();resetEntryForm();
+  // ── fun stats: celebrate goal hit / 7-day sales record ──
+  const newMonthTotal=prevMonthTotal+net,newDayTotal=prevDayTotal+net;
+  const goalHit=goals[monthKey]&&prevMonthTotal<goals[monthKey]&&newMonthTotal>=goals[monthKey];
+  const dailyRecord=best7>0&&newDayTotal>best7&&prevDayTotal<=best7;
+  if(goalHit){
+    fireConfetti();
+    setTimeout(()=>showToast('🎉 ถึงเป้าหมายเดือนนี้แล้ว!'),2400);
+  }else if(dailyRecord){
+    fireConfetti();
+    setTimeout(()=>showToast('🏆 วันนี้ขายดีที่สุดในรอบ 7 วัน! ยินดีด้วยจ้า'),2400);
+  }
 }
 
 // ═══════════════════════════════════════════════
@@ -2134,6 +2178,60 @@ function showCat(){
   });
 }
 
+function fireConfetti(){
+  const canvas=document.getElementById('confetti-canvas');
+  if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  const dpr=window.devicePixelRatio||1;
+  canvas.width=window.innerWidth*dpr;
+  canvas.height=window.innerHeight*dpr;
+  canvas.style.display='block';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  const colors=['#7A6FA0','#B8C4A0','#6B7A4A','#A99CD6','#E8877A','#F0EDF8'];
+  const W=window.innerWidth,H=window.innerHeight;
+  const N=90;
+  const parts=[];
+  for(let i=0;i<N;i++){
+    parts.push({
+      x:Math.random()*W,
+      y:-20-Math.random()*H*0.5,
+      w:5+Math.random()*5,
+      h:8+Math.random()*6,
+      rot:Math.random()*Math.PI*2,
+      vrot:(Math.random()-0.5)*0.3,
+      vy:2+Math.random()*3,
+      vx:(Math.random()-0.5)*2,
+      color:colors[Math.floor(Math.random()*colors.length)],
+      shape:Math.random()<0.5?'rect':'circle'
+    });
+  }
+  const start=performance.now();
+  const duration=2200;
+  function frame(now){
+    const elapsed=now-start;
+    ctx.clearRect(0,0,W,H);
+    let anyVisible=false;
+    parts.forEach(p=>{
+      p.x+=p.vx;p.y+=p.vy;p.rot+=p.vrot;p.vy+=0.02;
+      if(p.y<H+20)anyVisible=true;
+      ctx.save();
+      ctx.translate(p.x,p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle=p.color;
+      if(p.shape==='rect'){ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h);}
+      else{ctx.beginPath();ctx.arc(0,0,p.w/2,0,Math.PI*2);ctx.fill();}
+      ctx.restore();
+    });
+    if(elapsed<duration&&anyVisible){
+      requestAnimationFrame(frame);
+    }else{
+      ctx.clearRect(0,0,W,H);
+      canvas.style.display='none';
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
 // close ac on outside click
 document.addEventListener('click',e=>{if(!e.target.closest('.ac-wrap'))document.querySelectorAll('.ac-list').forEach(l=>l.style.display='none');});
 
@@ -2180,7 +2278,20 @@ function showApp(){
   document.getElementById('app-wrap').style.display='block';
 }
 
+function applyDarkModePref(){
+  const on=localStorage.getItem('darkMode')==='1';
+  document.documentElement.setAttribute('data-theme',on?'dark':'light');
+  const t=document.getElementById('dark-mode-toggle');
+  if(t) t.checked=on;
+}
+function toggleDarkMode(){
+  const on=document.getElementById('dark-mode-toggle').checked;
+  localStorage.setItem('darkMode',on?'1':'0');
+  document.documentElement.setAttribute('data-theme',on?'dark':'light');
+}
+
 function initApp(){
+  applyDarkModePref();
   populateModels();
   genMonthOptions('hist-month');
   genMonthOptions('info-month');
