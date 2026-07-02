@@ -827,6 +827,12 @@ select:disabled{opacity:.35;cursor:not-allowed}
     <div style="position:absolute;left:360px;top:270px;width:270px;height:67.5px;display:flex;align-items:center;justify-content:flex-start">
       <div id="ce-price" style="font-size:26px;font-weight:700;color:#2C2C2A"></div>
     </div>
+    <!-- "โอนเงินมาที่" label, in the free cell above the bank block -->
+    <div style="position:absolute;left:270px;top:270px;width:180px;height:67.5px;display:flex;align-items:flex-end;justify-content:flex-start;padding-bottom:6px">
+      <div style="font-size:12px;color:#9A9A94;font-weight:600">โอนเงินมาที่</div>
+    </div>
+    <!-- divider separating order info (above) from payment info (below) -->
+    <div style="position:absolute;left:60px;top:337.5px;width:600px;height:1px;background:#D8DDD0"></div>
     <!-- Bank brand (ชื่อธนาคาร): cell 44-45 -->
     <div style="position:absolute;left:270px;top:337.5px;width:180px;height:67.5px;display:flex;align-items:center;justify-content:flex-start">
       <div id="ce-bank-brand" style="font-size:14px;font-weight:600;color:#7A6FA0"></div>
@@ -839,9 +845,9 @@ select:disabled{opacity:.35;cursor:not-allowed}
     <div style="position:absolute;left:270px;top:472.5px;width:180px;height:67.5px;display:flex;align-items:center;justify-content:flex-start">
       <div id="ce-bank-num" style="font-size:18px;font-weight:700;letter-spacing:.1em;color:#2C2C2A"></div>
     </div>
-    <!-- QR: area cell 66-119 (fixed size 320x320, centered within the area, not stretched) -->
+    <!-- QR: area cell 66-119, image keeps its true aspect ratio, capped at 320px so it never stretches -->
     <div style="position:absolute;left:90px;top:540px;width:540px;height:472.5px;display:flex;align-items:center;justify-content:center">
-      <img id="ce-qr" style="width:320px;height:320px;object-fit:contain;border-radius:8px;display:none">
+      <img id="ce-qr" style="width:auto;height:auto;max-width:320px;max-height:320px;object-fit:contain;border-radius:8px;display:none">
     </div>
   </div>
 </div>
