@@ -801,26 +801,28 @@ select:disabled{opacity:.35;cursor:not-allowed}
 
   <button class="btn-primary" onclick="generateSummaryImage()">📸 บันทึกเป็นรูป</button>
 
-  <div id="cs-export-area" style="display:none;position:fixed;left:-9999px;top:0;background:white;width:720px;height:1080px;padding:40px;font-family:sans-serif;box-sizing:border-box;flex-direction:column;justify-content:center">
-    <div style="text-align:center;margin-bottom:28px">
-      <img id="ce-logo" src="" alt="logo" style="display:block;margin:0 auto 10px;max-width:60px;max-height:40px;object-fit:contain">
-      <div style="font-size:22px;font-weight:700;color:#2C2C2A">สรุปยอดสั่งซื้อ</div>
+  <div id="cs-export-area" style="display:none;position:fixed;left:-9999px;top:0;background:white;width:720px;height:1080px;padding:32px;font-family:sans-serif;box-sizing:border-box;flex-direction:column">
+    <div style="text-align:center;margin-bottom:14px;flex-shrink:0">
+      <img id="ce-logo" src="" alt="logo" style="display:block;margin:0 auto 6px;max-width:56px;max-height:36px;object-fit:contain">
+      <div style="font-size:20px;font-weight:700;color:#2C2C2A">สรุปยอดสั่งซื้อ</div>
     </div>
-    <div style="display:flex;gap:20px;align-items:flex-start;margin-bottom:24px">
-      <img id="ce-prod-img" style="width:140px;height:140px;object-fit:cover;border-radius:10px;flex-shrink:0;display:none">
+    <div style="display:flex;gap:16px;align-items:flex-start;margin-bottom:14px;flex-shrink:0">
+      <img id="ce-prod-img" style="width:110px;height:110px;object-fit:cover;border-radius:10px;flex-shrink:0;display:none">
       <div>
-        <div id="ce-model" style="font-size:20px;font-weight:700;color:#2C2C2A"></div>
-        <div id="ce-color" style="font-size:15px;color:#7A6FA0;margin-bottom:8px"></div>
-        <div id="ce-name" style="font-size:14px;color:#5C5C58"></div>
-        <div id="ce-price" style="font-size:28px;font-weight:700;color:#2C2C2A;margin-top:8px"></div>
+        <div id="ce-model" style="font-size:18px;font-weight:700;color:#2C2C2A"></div>
+        <div id="ce-color" style="font-size:14px;color:#7A6FA0;margin-bottom:6px"></div>
+        <div id="ce-name" style="font-size:13px;color:#5C5C58"></div>
+        <div id="ce-price" style="font-size:26px;font-weight:700;color:#2C2C2A;margin-top:6px"></div>
       </div>
     </div>
-    <div style="border-top:1px solid #D8DDD0;padding-top:20px">
-      <div style="font-size:13px;color:#9A9A94;margin-bottom:6px">โอนเงินมาที่</div>
-      <div id="ce-bank-brand" style="font-size:13px;font-weight:600;color:#7A6FA0;margin-bottom:2px"></div>
-      <div id="ce-bank-name" style="font-size:17px;font-weight:600;color:#2C2C2A"></div>
-      <div id="ce-bank-num" style="font-size:22px;font-weight:700;letter-spacing:.12em;color:#2C2C2A;margin-bottom:16px"></div>
-      <img id="ce-qr" style="width:320px;height:320px;display:block;margin:0 auto;border-radius:8px;display:none">
+    <div style="border-top:1px solid #D8DDD0;padding-top:12px;flex-shrink:0">
+      <div style="font-size:12px;color:#9A9A94;margin-bottom:4px">โอนเงินมาที่</div>
+      <div id="ce-bank-brand" style="font-size:12px;font-weight:600;color:#7A6FA0;margin-bottom:2px"></div>
+      <div id="ce-bank-name" style="font-size:15px;font-weight:600;color:#2C2C2A"></div>
+      <div id="ce-bank-num" style="font-size:20px;font-weight:700;letter-spacing:.12em;color:#2C2C2A"></div>
+    </div>
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;min-height:0;padding-top:10px">
+      <img id="ce-qr" style="width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;display:none">
     </div>
   </div>
 </div>
@@ -2921,7 +2923,7 @@ function generateSummaryImage(){
   var ceQr=document.getElementById('ce-qr');
   if(pay.qrB64){ceQr.src='data:image/jpeg;base64,'+pay.qrB64;ceQr.style.display='block';}
   else{ceQr.style.display='none';}
-  setTimeout(function(){
+  requestAnimationFrame(function(){
     if(typeof html2canvas==='undefined'){showToast('กรุณาเปิดผ่าน GitHub');ce.style.display='none';return;}
     html2canvas(ce,{scale:2,useCORS:true,backgroundColor:'#ffffff'}).then(function(canvas){
       ce.style.display='none';
@@ -2930,16 +2932,21 @@ function generateSummaryImage(){
         var fileName='summary_'+Date.now()+'.jpg';
         var file=new File([blob],fileName,{type:'image/jpeg'});
         if(navigator.canShare&&navigator.canShare({files:[file]})){
-          navigator.share({files:[file],title:'สรุปยอดสั่งซื้อ'}).catch(function(){});
+          navigator.share({files:[file],title:'สรุปยอดสั่งซื้อ'}).catch(function(err){
+            var a=document.createElement('a');
+            a.href=URL.createObjectURL(blob);
+            a.download=fileName;
+            a.click();showToast('บันทึกรูปแล้ว \u2713');
+          });
           return;
         }
-      var a=document.createElement('a');
-      a.href=URL.createObjectURL(blob);
-      a.download='summary_'+Date.now()+'.jpg';
-      a.click();showToast('บันทึกรูปแล้ว \u2713');
+        var a=document.createElement('a');
+        a.href=URL.createObjectURL(blob);
+        a.download=fileName;
+        a.click();showToast('บันทึกรูปแล้ว \u2713');
       },'image/jpeg',0.92);
     }).catch(function(){ce.style.display='none';showToast('เกิดข้อผิดพลาด');});
-  },200);
+  });
 }
 function showAddressPopup(id){
   const e=loadEnt().find(x=>x.id===id);if(!e||!e.address)return;
