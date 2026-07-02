@@ -22,7 +22,8 @@
   --primary:#6B7A4A;--primary-dk:#4A5A30;--primary-lt:#EEF2E6;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN',-apple-system,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;-webkit-font-smoothing:antialiased}
+html{scroll-behavior:smooth}
+body{font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN',-apple-system,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;-webkit-font-smoothing:antialiased;-webkit-overflow-scrolling:touch;overscroll-behavior-y:none}
 /* ── NAV ── */
 .nav{background:var(--sf);border-bottom:1px solid var(--bd);display:flex;align-items:stretch;padding:0 1rem;position:sticky;top:0;z-index:100}
 .nav-logo{font-size:13px;font-weight:700;letter-spacing:.04em;padding:14px 16px 14px 0;border-right:1px solid var(--bd);margin-right:4px;white-space:nowrap;color:var(--ink)}
@@ -333,8 +334,8 @@ select:disabled{opacity:.35;cursor:not-allowed}
 <!-- NAV -->
 <nav class="nav">
   <span class="nav-logo">🛍 Tracker</span>
-  <button class="nav-tab" onclick="switchNav('summary')">สรุปยอด</button>
-  <button class="nav-tab active" onclick="switchNav('sales')">ยอดขาย</button>
+  <button class="nav-tab active" onclick="switchNav('summary')">สรุปยอด</button>
+  <button class="nav-tab" onclick="switchNav('sales')">ยอดขาย</button>
   <button class="nav-tab" onclick="switchNav('inventory')">สต็อก</button>
   <button class="nav-tab" onclick="switchNav('expense')">ค่าใช้จ่าย</button>
   <button class="nav-tab" onclick="switchNav('dashboard')">Dashboard</button>
@@ -348,7 +349,7 @@ select:disabled{opacity:.35;cursor:not-allowed}
 <div id="low-stock-banner" class="alert-banner" style="display:none" onclick="switchNav('inventory')">⚠ สินค้าใกล้หมดสต็อก — กดเพื่อดู</div>
 
 <!-- ════════════════════ SALES ════════════════════ -->
-<div class="page active" id="nav-sales">
+<div class="page" id="nav-sales">
   <div class="tabs">
     <button class="tab active" onclick="switchSalesTab('entry')">+ บันทึก</button>
     <button class="tab" onclick="switchSalesTab('history')">ประวัติ</button>
@@ -778,7 +779,7 @@ select:disabled{opacity:.35;cursor:not-allowed}
   </div>
 </div>
 
-<div class="page" id="nav-summary">
+<div class="page active" id="nav-summary">
   <div class="section">
     <div class="sec-title">สินค้า</div>
     <div id="cs-prod-gallery" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px"></div>
@@ -1107,6 +1108,7 @@ function genMonthOptions(selId,addAll=true){
 // NAV
 // ═══════════════════════════════════════════════
 function switchNav(n){
+  window.scrollTo(0,0);
   ['sales','inventory','expense','dashboard','summary','cfg'].forEach(function(x){
     var btn=document.querySelector('.nav-tab[onclick*="switchNav(\'' + x + '\')"]');
     var pg=document.getElementById('nav-'+x);
@@ -2185,6 +2187,7 @@ function initApp(){
   addItemRow();
   checkOverdue();
   renderGoals();
+  renderCustomerSummary(); // สรุปยอด is now the default landing page
   // โหลด inventory
   loadInvFromSB().then(()=>checkLowStock());
 }
