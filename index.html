@@ -1441,7 +1441,12 @@ function makeCSVRows(type='main'){
   });
   return rows.length>1?rows:null;
 }
-function rowsToCSV(rows){return'\uFEFF'+rows.map(r=>r.map(v=>{const s=String(v);return(s.includes(',')||s.includes('"'))?`"${s.replace(/"/g,'""')}"`  :s;}).join(',')).join('\r\n');}
+function csvSafe(v){
+  let s=String(v);
+  if(/^[=+\-@\t\r]/.test(s)) s="'"+s; // neutralize CSV formula injection when opened in Excel
+  return (s.includes(',')||s.includes('"')||s.includes('\n'))?`"${s.replace(/"/g,'""')}"`:s;
+}
+function rowsToCSV(rows){return'\uFEFF'+rows.map(r=>r.map(v=>csvSafe(v)).join(',')).join('\r\n');}
 function exportCSV(type){
   const rows=makeCSVRows(type);if(!rows){showToast('ไม่มีข้อมูล');return;}
   const month=document.getElementById('hist-month').value||'all';
@@ -1595,7 +1600,7 @@ function addItemRow(name='',qty=1,price=''){
   const id=++itemIdCtr;
   const tr=document.createElement('tr');tr.id=`irow-${id}`;
   tr.innerHTML=`<td><div class="ac-wrap">
-    <input type="text" value="${name}" placeholder="รายการ" oninput="acItem(this,'aci-${id}')" onchange="calcTotals()" autocomplete="off">
+    <input type="text" value="${esc(name)}" placeholder="รายการ" oninput="acItem(this,'aci-${id}')" onchange="calcTotals()" autocomplete="off">
     <div class="ac-list" id="aci-${id}"></div></div></td>
     <td><input type="number" value="${qty}" min="1" onchange="calcTotals()"></td>
     <td><input type="number" value="${price}" placeholder="0.00" step="0.01" onchange="calcTotals()"></td>
@@ -1678,7 +1683,7 @@ function renderBills(){
       </div>
       <div class="bill-body" id="bb-${b.id}">
         ${b.receiptImg?`<img src="${b.receiptImg}" style="max-width:100%;border-radius:var(--r);margin-bottom:10px;border:1px solid var(--bd)">`:''}
-        ${b.items.map(i=>`<div class="bill-item-row"><span>${i.name} ×${i.qty}</span><span>${fmtB(i.qty*i.price)}</span></div>`).join('')}
+        ${b.items.map(i=>`<div class="bill-item-row"><span>${esc(i.name)} ×${i.qty}</span><span>${fmtB(i.qty*i.price)}</span></div>`).join('')}
         <div style="font-size:12px;color:var(--ink3);margin-top:6px;text-align:right">${b.vatMode==='none'?'ไม่มี VAT':b.vatMode==='included'?'รวม VAT แล้ว':'+ VAT 7%'}</div>
       </div>
     </div>`;
@@ -1699,7 +1704,7 @@ function buildReceiptHTML(bill){
   const vatLabel=bill.vatMode==='none'?'ไม่มี VAT':bill.vatMode==='included'?'รวม VAT 7% แล้ว':'+ VAT 7%';
   const itemRows=bill.items.map(i=>`
     <tr>
-      <td style="padding:7px 10px;border-bottom:1px solid #F0EDE9;font-size:13px;color:#1C1C1A">${i.name}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid #F0EDE9;font-size:13px;color:#1C1C1A">${esc(i.name)}</td>
       <td style="padding:7px 10px;border-bottom:1px solid #F0EDE9;text-align:center;font-size:13px;color:#555">${i.qty}</td>
       <td style="padding:7px 10px;border-bottom:1px solid #F0EDE9;text-align:right;font-size:13px;color:#555">${fmtB(i.price)}</td>
       <td style="padding:7px 10px;border-bottom:1px solid #F0EDE9;text-align:right;font-size:13px;font-weight:600;color:#1C1C1A">${fmtB(i.qty*i.price)}</td>
@@ -2371,7 +2376,7 @@ function renderStock(){
     const bg=isZero?'#FFF8F8':isLow?'#FFFDF5':'var(--sf)';
     return`<div style="border:1px solid ${borderColor};border-radius:var(--r);padding:12px;margin-bottom:6px;background:${bg}">
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <span style="font-size:14px;font-weight:600;color:var(--ink)">${i.name}</span>
+        <span style="font-size:14px;font-weight:600;color:var(--ink)">${esc(i.name)}</span>
         <span style="font-size:22px;font-weight:500;color:${isZero?'var(--err)':isLow?'var(--warn)':'var(--matcha)'}">${qty}</span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
@@ -2408,7 +2413,7 @@ function quickAdjust(id,delta,src){
   modal.id='adj-modal';
   modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem';
   modal.innerHTML=`<div style="background:var(--sf);border-radius:var(--r);padding:1.5rem;width:100%;max-width:300px;box-shadow:0 8px 32px rgba(0,0,0,.2)">
-    <div style="font-size:15px;font-weight:700;margin-bottom:4px">${item.name}</div>
+    <div style="font-size:15px;font-weight:700;margin-bottom:4px">${esc(item.name)}</div>
     <div style="font-size:12px;color:var(--ink3);margin-bottom:1.25rem">${src==='main'?'Main':'Defect'} Stock ปัจจุบัน: <b>${current}</b></div>
     <div style="font-size:12px;color:var(--ink2);font-weight:600;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">จำนวนที่จะ${dir}</div>
     <input type="number" id="adj-qty-modal" value="1" min="1" style="width:100%;padding:10px;border:1px solid var(--bd);border-radius:var(--r);font-size:20px;font-family:inherit;outline:none;text-align:center;margin-bottom:1rem" autofocus>
@@ -2453,7 +2458,7 @@ function openMoveModal(id,direction){
   modal.id='move-modal';
   modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem';
   modal.innerHTML=`<div style="background:var(--sf);border-radius:var(--r);padding:1.5rem;width:100%;max-width:300px;box-shadow:0 8px 32px rgba(0,0,0,.2)">
-    <div style="font-size:15px;font-weight:700;margin-bottom:4px">${item.name}</div>
+    <div style="font-size:15px;font-weight:700;margin-bottom:4px">${esc(item.name)}</div>
     <div style="font-size:12px;color:var(--ink3);margin-bottom:1.25rem">${fromLabel} คงเหลือ: <b>${fromStock}</b></div>
     <div style="font-size:13px;color:var(--ink2);font-weight:600;margin-bottom:8px">${fromLabel} → ${toLabel}</div>
     <input type="number" id="move-qty" value="1" min="1" max="${fromStock}" style="width:100%;padding:10px;border:1px solid var(--bd);border-radius:var(--r);font-size:20px;font-family:inherit;outline:none;text-align:center;margin-bottom:1rem">
@@ -2720,7 +2725,7 @@ function renderForecast(){
       <th style="text-align:right">จะสั่ง</th>
     </tr></thead>
     <tbody>${rows.map(r=>`<tr>
-      <td style="font-weight:${r.recommended>0?'600':'400'};white-space:nowrap">${r.name}</td>
+      <td style="font-weight:${r.recommended>0?'600':'400'};white-space:nowrap">${esc(r.name)}</td>
       <td style="text-align:right;color:${r.currentStock<=0?'var(--err)':'var(--ink)'}">${r.currentStock}</td>
       <td style="text-align:right">${r.avgMonthly}</td>
       <td style="text-align:right">${r.forecastDemand}</td>
@@ -2797,7 +2802,7 @@ async function renderLog(){
     const typeCls={SALE:'log-sale',RESTORE:'log-restore',ADJUST:'log-adjust',MOVE_DEFECT:'log-move',MOVE_MAIN:'log-move',INIT:'log-adjust',IMPORT:'log-adjust'};
     el.innerHTML=logs.map(l=>`<div class="log-row">
       <div style="display:flex;flex-direction:column;gap:3px;flex:1">
-        <span style="font-size:13px;font-weight:600">${l.product_name}</span>
+        <span style="font-size:13px;font-weight:600">${esc(l.product_name)}</span>
         <span style="color:var(--ink3)">${(l.created_at||'').slice(0,16).replace('T',' ')}</span>
         <span style="font-size:11px;color:var(--ink2)">Main: ${l.main_before}→${l.main_after} / Defect: ${l.defect_before}→${l.defect_after}</span>
       </div>
