@@ -814,30 +814,35 @@ select:disabled{opacity:.35;cursor:not-allowed}
     <div style="position:absolute;left:90px;top:135px;width:180px;height:202.5px;display:flex;align-items:center;justify-content:center">
       <img id="ce-prod-img" style="max-width:100%;max-height:100%;object-fit:cover;border-radius:10px;display:none">
     </div>
-    <!-- Model / Color: cell 21-23 -->
-    <div style="position:absolute;left:360px;top:135px;width:270px;height:67.5px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center">
+    <!-- Section 1: product / price — lines packed tight, no big gaps -->
+    <div style="position:absolute;left:360px;top:150px;width:270px;height:34px;display:flex;align-items:center;justify-content:flex-start">
       <div id="ce-model" style="font-size:18px;font-weight:700;color:#2C2C2A;line-height:1.2"></div>
+    </div>
+    <div style="position:absolute;left:360px;top:184px;width:270px;height:22px;display:flex;align-items:center;justify-content:flex-start">
       <div id="ce-color" style="font-size:13px;color:#7A6FA0;line-height:1.2"></div>
     </div>
-    <!-- Customer name: cell 29-31 -->
-    <div style="position:absolute;left:360px;top:202.5px;width:270px;height:67.5px;display:flex;align-items:center;justify-content:flex-start">
+    <div style="position:absolute;left:360px;top:206px;width:270px;height:20px;display:flex;align-items:center;justify-content:flex-start">
       <div id="ce-name" style="font-size:14px;color:#5C5C58"></div>
     </div>
-    <!-- Price: cell 37-39 -->
-    <div style="position:absolute;left:360px;top:270px;width:270px;height:67.5px;display:flex;align-items:center;justify-content:flex-start">
+    <div style="position:absolute;left:360px;top:228px;width:270px;height:40px;display:flex;align-items:center;justify-content:flex-start">
       <div id="ce-price" style="font-size:26px;font-weight:700;color:#2C2C2A"></div>
     </div>
-    <!-- Bank brand (ชื่อธนาคาร): cell 44-45 -->
-    <div style="position:absolute;left:270px;top:337.5px;width:180px;height:67.5px;display:flex;align-items:center;justify-content:flex-start">
+    <!-- divider: section 1 (order) vs section 2 (payment) -->
+    <div style="position:absolute;left:60px;top:337.5px;width:600px;height:1px;background:#D8DDD0"></div>
+    <!-- Section 2: payment — label + bank brand + account number + account name, packed tight -->
+    <div style="position:absolute;left:270px;top:348px;width:270px;height:20px;display:flex;align-items:center;justify-content:flex-start">
+      <div style="font-size:12px;color:#9A9A94;font-weight:600">โอนเงินมาที่</div>
+    </div>
+    <div style="position:absolute;left:270px;top:371px;width:270px;height:24px;display:flex;align-items:center;justify-content:flex-start">
       <div id="ce-bank-brand" style="font-size:14px;font-weight:600;color:#7A6FA0"></div>
     </div>
-    <!-- Account holder name (ชื่อบัญชี): cell 52-53 -->
-    <div style="position:absolute;left:270px;top:405px;width:180px;height:67.5px;display:flex;align-items:center;justify-content:flex-start">
-      <div id="ce-bank-name" style="font-size:16px;font-weight:600;color:#2C2C2A"></div>
-    </div>
-    <!-- Account number (เลขบัญชี): cell 60-61 -->
-    <div style="position:absolute;left:270px;top:472.5px;width:180px;height:67.5px;display:flex;align-items:center;justify-content:flex-start">
+    <!-- เลขบัญชี (account number) — now first -->
+    <div style="position:absolute;left:270px;top:398px;width:270px;height:30px;display:flex;align-items:center;justify-content:flex-start">
       <div id="ce-bank-num" style="font-size:18px;font-weight:700;letter-spacing:.1em;color:#2C2C2A"></div>
+    </div>
+    <!-- ชื่อบัญชี (account holder name) — now second -->
+    <div style="position:absolute;left:270px;top:430px;width:270px;height:26px;display:flex;align-items:center;justify-content:flex-start">
+      <div id="ce-bank-name" style="font-size:16px;font-weight:600;color:#2C2C2A"></div>
     </div>
     <!-- QR: area cell 66-119, image keeps its true aspect ratio, capped at 320px so it never stretches -->
     <div style="position:absolute;left:90px;top:540px;width:540px;height:472.5px;display:flex;align-items:center;justify-content:center">
