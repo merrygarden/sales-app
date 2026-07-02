@@ -945,6 +945,8 @@ async function syncFromSupabase(){
         if(s.key==='goals') lsSet(GOALSK,s.value);
         if(s.key==='delivery') lsSet(DSK,s.value);
         if(s.key==='shopee') lsSet(SHOPEESK,s.value);
+        if(s.key==='prodImgs') lsSet('merry_prodImgs',s.value);
+        if(s.key==='payInfo') lsSet('merry_payInfo',s.value);
       });
     }
     showToast('ซิงค์เสร็จแล้ว ✓');
