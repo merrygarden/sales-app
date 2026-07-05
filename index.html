@@ -1993,7 +1993,7 @@ function renderSettings(){
 }
 function saveBasePrice(m){const v=parseInt(document.getElementById('bp-'+m).value);if(!v)return;const cat=loadCat();cat[m].basePrice=v;saveCat(cat);showToast('บันทึกแล้ว ✓');}
 function toggleModel(h){const b=h.nextElementSibling,op=b.classList.toggle('open');h.querySelector('.model-name').textContent=(op?'▼ ':'▶ ')+h.querySelector('.model-name').textContent.slice(2);}
-function addModel(){const n=document.getElementById('new-model-input').value.trim();if(!n)return;const cat=loadCat();if(cat[n]){showToast('มีอยู่แล้ว');return;}cat[n]={basePrice:0,colors:[],prices:{}};saveCat(cat);document.getElementById('new-model-input').value='';renderSettings();showToast('เพิ่มแล้ว ✓');}
+function addModel(){const n=document.getElementById('new-model-input').value.trim();if(!n)return;const cat=loadCat();if(cat[n]){showToast('มีอยู่แล้ว');return;}cat[n]={basePrice:0,colors:[],prices:{}};saveCat(cat);document.getElementById('new-model-input').value='';renderSettings();const body=document.getElementById('body-'+n);if(body){body.classList.add('open');const nameEl=body.previousElementSibling?.querySelector('.model-name');if(nameEl)nameEl.textContent='▼ '+nameEl.textContent.slice(2);}showToast('เพิ่มแล้ว ✓ — เลื่อนลงไปเพิ่มสี/ราคาได้เลย');}
 function deleteModel(m){if(!confirm('ลบ "'+m+'"?'))return;const cat=loadCat();delete cat[m];saveCat(cat);renderSettings();showToast('ลบแล้ว');}
 async function addColor(model){
   const inp=document.getElementById('nc-'+model),c=inp.value.trim();if(!c)return;
