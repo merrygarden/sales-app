@@ -208,7 +208,7 @@ select:disabled{opacity:.35;cursor:not-allowed}
 /* ── RECEIPT IMG ── */
 .receipt-thumb{width:60px;height:60px;object-fit:cover;border-radius:2px;border:1px solid var(--bd)}
 /* ── DASHBOARD CATEGORY ── */
-.cat-badge{display:inline-block;font-size:10px;padding:2px 7px;border-radius:2px;font-weight:700;letter-spacing:.04em;margin-right:4px}
+.cat-badge{display:inline-block;font-size:10px;padding:2px 7px;border-radius:2px;font-weight:700;letter-spacing:.04em;margin-right:4px;background:#F5F5F2;color:#6A6A66}
 .cat-สินค้า{background:#EBF3ED;color:#2A5E38}
 .cat-ขนส่ง{background:#E8F0FE;color:#1A4A9A}
 .cat-การตลาด{background:#FDF5E6;color:#8A6010}
@@ -685,6 +685,7 @@ select:disabled{opacity:.35;cursor:not-allowed}
         <button class="btn-green" onclick="downloadAllReceipts()">⬇ ZIP รูป</button>
         <button class="btn-copy" onclick="exportExpenseCSV()">⬇ CSV</button>
       </div>
+      <div class="field" style="margin-bottom:10px"><input type="text" id="bills-search" placeholder="🔍 ค้นหาผู้จัดจำหน่าย / รายการ" oninput="renderBills()"></div>
       <div id="forecast-alerts"></div>
       <div id="bill-list"><div class="no-data">เลือกเดือนด้านบน</div></div>
     </div>
@@ -737,6 +738,21 @@ select:disabled{opacity:.35;cursor:not-allowed}
       <select id="goal-month-input" style="flex:1;padding:8px 10px;border:1px solid var(--bd);border-radius:var(--r);font-size:13px;font-family:inherit;outline:none;background:var(--sf)"></select>
       <input type="number" id="goal-amount-input" placeholder="ยอดเป้า" min="0" style="flex:1">
       <button class="btn-add" onclick="addGoal()">+ เพิ่ม</button>
+    </div>
+  </div>
+  <div class="section">
+    <div class="sec-title">งบประมาณค่าใช้จ่ายรายเดือน (ต่อหมวดหมู่)</div>
+    <p style="font-size:12px;color:var(--ink3);margin-bottom:10px">ตั้งงบต่อหมวด ระบบจะใช้เทียบกับยอดจริงในหน้าแดชบอร์ด (ต้องเลือกเดือนใดเดือนหนึ่ง)</p>
+    <div id="budget-settings-list"></div>
+  </div>
+  <div class="section">
+    <div class="sec-title">หมวดหมู่ค่าใช้จ่าย</div>
+    <p style="font-size:12px;color:var(--ink3);margin-bottom:10px">แก้คีย์เวิร์ดของแต่ละหมวด (คั่นด้วยจุลภาค) หรือเพิ่มหมวดใหม่ ระบบใช้จับคู่ชื่อรายการอัตโนมัติ</p>
+    <div id="catrules-list"></div>
+    <div class="new-model-row" style="margin-top:8px">
+      <input type="text" id="new-cat-name" placeholder="ชื่อหมวดใหม่">
+      <input type="text" id="new-cat-kw" placeholder="คีย์เวิร์ด คั่นด้วย ,">
+      <button class="btn-add" onclick="addCatRule()">+ เพิ่ม</button>
     </div>
   </div>
   <div class="section">
@@ -953,7 +969,7 @@ const sbFetch=async(path,opts={},retried)=>{
 // STORAGE — Supabase + localStorage cache
 // ═══════════════════════════════════════════════
 // localStorage ใช้เป็น cache เพื่อให้แอปทำงานได้ offline และเร็ว
-const SK='sales_v3',CK='catalog_v2',GSK='gs_v1',GOALSK='goals_v1',DSK='delivery_v1',BSK='bills_v1',SHOPEESK='shopee_v1';
+const SK='sales_v3',CK='catalog_v2',GSK='gs_v1',GOALSK='goals_v1',DSK='delivery_v1',BSK='bills_v1',SHOPEESK='shopee_v1',BUDGETSK='budget_v1',CATRULESK='catrules_v1';
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}};
 const lsSet=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
@@ -1008,6 +1024,8 @@ const loadDel=()=>lsGet(DSK,{});
 const saveDel=async(d)=>{lsSet(DSK,d);sbSetting('delivery',d).catch(()=>{});};
 const loadShopeeStored=()=>lsGet(SHOPEESK,[]);
 const saveShopeeStored=async(a)=>{lsSet(SHOPEESK,a);sbSetting('shopee',a).catch(()=>{});};
+const loadBudget=()=>lsGet(BUDGETSK,{});
+const saveBudget=async(b)=>{lsSet(BUDGETSK,b);sbSetting('budget',b).catch(()=>{});};
 
 async function sbSetting(key,value){
   await sbFetch('/rest/v1/app_settings?on_conflict=key',{
@@ -1022,13 +1040,18 @@ async function syncFromSupabase(){
   showToast('กำลังซิงค์ข้อมูล...');
   try{
     // entries — อัปเดต localStorage เสมอ แม้ว่าจะว่าง
+    // หมายเหตุ: address/note เป็นข้อมูลอ่อนไหว ไม่ถูกส่งขึ้น Supabase (เก็บในเครื่องเท่านั้น)
+    // ต้อง merge ค่าที่มีอยู่ในเครื่องกลับเข้าไป ไม่งั้นจะถูกลบทิ้งทุกครั้งที่ Sync
+    const localEntMap={};loadEnt().forEach(e=>{localEntMap[e.id]=e;});
     const ents=await sbFetch('/rest/v1/entries?select=*&order=id.asc');
     const mappedEnts=(ents||[]).map(e=>({
       id:e.id,date:e.date,model:e.model,color:e.color,channel:e.channel,
       price:e.price,basePrice:e.base_price,qty:e.qty,
       extraDisc:e.extra_disc,totalDisc:e.total_disc,net:e.net,
       order:e.order_no,custName:e.cust_name,
-      deliveryStatus:e.delivery_status,scheduledDate:e.scheduled_date
+      deliveryStatus:e.delivery_status,scheduledDate:e.scheduled_date,
+      address:(localEntMap[e.id]&&localEntMap[e.id].address)||'',
+      note:(localEntMap[e.id]&&localEntMap[e.id].note)||''
     }));
     lsSet(SK,mappedEnts);
 
@@ -1074,7 +1097,7 @@ const DEFAULT_CAT={
 // ═══════════════════════════════════════════════
 // ACCOUNTING CLASSIFIER
 // ═══════════════════════════════════════════════
-const CAT_RULES=[
+const DEFAULT_CAT_RULES=[
   {cat:'สินค้า/วัตถุดิบ', cls:'สินค้า', kw:['กล่อง','บรรจุภัณฑ์','วัตถุดิบ','ผ้า','หนัง','ซิป','ด้าย','กระดุม','โลโก้','ป้าย','tag','packaging','material','fabric','zipper']},
   {cat:'ค่าขนส่ง', cls:'ขนส่ง', kw:['ขนส่ง','ส่ง','ไปรษณีย์','Kerry','Flash','J&T','DHL','FedEx','Lalamove','Grab','ค่าส่ง','shipping','delivery']},
   {cat:'การตลาด/โฆษณา', cls:'การตลาด', kw:['โฆษณา','Ads','Facebook','Instagram','TikTok','Google','Boost','โปรโมท','ถ่ายภาพ','photo','prop','marketing']},
@@ -1082,15 +1105,31 @@ const CAT_RULES=[
   {cat:'สาธารณูปโภค', cls:'สาธารณูปโภค', kw:['ไฟฟ้า','น้ำ','internet','เน็ต','โทรศัพท์','ค่าเช่า','rent','สาธารณูปโภค']},
   {cat:'ค่าจ้าง/พนักงาน', cls:'พนักงาน', kw:['เงินเดือน','ค่าจ้าง','พนักงาน','salary','wage','freelance','จ้าง']},
 ];
+let CAT_RULES=lsGet(CATRULESK,JSON.parse(JSON.stringify(DEFAULT_CAT_RULES)));
+function saveCatRules(){lsSet(CATRULESK,CAT_RULES);sbSetting('catrules',CAT_RULES).catch(()=>{});}
 function classifyItem(name){
   const n=(name||'').toLowerCase();
   for(const r of CAT_RULES){if(r.kw.some(k=>n.includes(k.toLowerCase())))return r;}
   return{cat:'อื่นๆ',cls:'อื่นๆ'};
 }
+// จัดหมวดรายการทั้งหมดในบิล แยกตามรายการจริง (ไม่ใช้แค่รายการแรก)
+function billCatBreakdown(bill){
+  const map={};
+  if(!bill.items)return map;
+  bill.items.forEach(i=>{
+    const c=classifyItem(i.name),val=(i.qty||0)*(i.price||0);
+    if(!map[c.cat])map[c.cat]={cls:c.cls,total:0};
+    map[c.cat].total+=val;
+  });
+  return map;
+}
+// หมวดเด่นของบิล (ยอดสูงสุด) ใช้แสดงเป็น badge ในหน้าประวัติ — ถ้ามีหลายหมวดจะบอกจำนวนหมวดเพิ่มด้วย
 function classifyBill(bill){
-  // use first item's category
-  if(!bill.items||!bill.items.length)return{cat:'อื่นๆ',cls:'อื่นๆ'};
-  return classifyItem(bill.items[0].name);
+  const map=billCatBreakdown(bill);
+  const arr=Object.entries(map).sort((a,b)=>b[1].total-a[1].total);
+  if(!arr.length)return{cat:'อื่นๆ',cls:'อื่นๆ'};
+  const[topCat,topV]=arr[0];
+  return arr.length>1?{cat:`${topCat} +${arr.length-1}`,cls:topV.cls}:{cat:topCat,cls:topV.cls};
 }
 
 // ═══════════════════════════════════════════════
@@ -1554,7 +1593,14 @@ function renderDelivery(){
     </div>`;
   }).join('');
 }
-function markSent(id){const del=loadDel();if(!del[id])del[id]={};del[id].status='sent';saveDel(del);checkOverdue();renderDelivery();}
+function markSent(id){
+  const del=loadDel();if(!del[id])del[id]={};del[id].status='sent';saveDel(del);
+  // ลบที่อยู่ลูกค้าออกอัตโนมัติเมื่อจัดส่งแล้ว (ไม่จำเป็นต้องเก็บต่อ ลดความเสี่ยงข้อมูลรั่วไหล)
+  const ents=loadEnt();
+  const idx=ents.findIndex(e=>e.id===id);
+  if(idx>-1&&ents[idx].address){ents[idx].address='';saveEnt(ents);}
+  checkOverdue();renderDelivery();
+}
 function markPrep(id){const del=loadDel();if(!del[id])del[id]={};del[id].status='prep';saveDel(del);checkOverdue();renderDelivery();}
 function setSched(id,val){const del=loadDel();if(!del[id])del[id]={status:'prep'};del[id].scheduledDate=val;saveDel(del);checkOverdue();renderDelivery();}
 
@@ -1612,7 +1658,7 @@ function renderInfo(){
 // ═══════════════════════════════════════════════
 // EXPENSE — ENTRY
 // ═══════════════════════════════════════════════
-let vatMode='none',itemIdCtr=0,receiptDataURL=null;
+let vatMode='none',itemIdCtr=0,receiptDataURL=null,editingBillId=null;
 document.getElementById('bill-date').value=today;
 
 function toggleFcFields(){document.getElementById('forecast-fields').style.display=document.getElementById('forecast-toggle').checked?'block':'none';}
@@ -1697,10 +1743,57 @@ function saveBill(){
   else if(vatMode==='included'){sub=raw/1.07;vat=raw-sub;grand=raw;}
   else{sub=raw;vat=raw*0.07;grand=raw+vat;}
   const fcOn=document.getElementById('forecast-toggle').checked;
-  const bill={id:Date.now(),date,vendor,items,vatMode,subtotal:sub,vat,grand,receiptImg:receiptDataURL||null,forecast:fcOn?{interval:parseInt(document.getElementById('fc-interval').value)||30,unit:document.getElementById('fc-unit').value,lastDate:date}:null};
-  const bills=loadBills();bills.unshift(bill);saveBills(bills);
+  const bill={id:editingBillId||Date.now(),date,vendor,items,vatMode,subtotal:sub,vat,grand,receiptImg:receiptDataURL||null,forecast:fcOn?{interval:parseInt(document.getElementById('fc-interval').value)||30,unit:document.getElementById('fc-unit').value,lastDate:date}:null};
+  const bills=loadBills();
+  if(editingBillId){
+    const idx=bills.findIndex(b=>b.id===editingBillId);
+    if(idx>-1) bills[idx]=bill; else bills.unshift(bill);
+  }else{
+    bills.unshift(bill);
+  }
+  saveBills(bills);
   genMonthOptions('bills-month');genMonthOptions('report-month');genMonthOptions('dash-month');
-  showToast('บันทึกแล้ว ✓');resetBillForm();
+  showToast(editingBillId?'แก้ไขแล้ว ✓':'บันทึกแล้ว ✓');resetBillForm();
+}
+
+// ── แก้ไข / ทำซ้ำบิล ──
+function editBill(id){
+  const bill=loadBills().find(b=>b.id===id);if(!bill)return;
+  editingBillId=id;
+  switchNav('expense');switchExpTab('eentry');
+  fillBillForm(bill,bill.date);
+  document.getElementById('btn-save-bill').textContent='บันทึกการแก้ไข';
+  showToast('แก้ไขบิล — เลื่อนลงเพื่อบันทึก');
+}
+function duplicateBill(id){
+  const bill=loadBills().find(b=>b.id===id);if(!bill)return;
+  editingBillId=null;
+  switchNav('expense');switchExpTab('eentry');
+  fillBillForm(bill,today,true);
+  document.getElementById('btn-save-bill').textContent='บันทึกบิล';
+  showToast('ทำซ้ำบิล — แก้ไขแล้วกดบันทึก');
+}
+function fillBillForm(bill,dateVal,skipReceiptAndForecast){
+  document.getElementById('bill-date').value=dateVal;
+  document.getElementById('bill-vendor').value=bill.vendor||'';
+  document.getElementById('items-tbody').innerHTML='';
+  bill.items.forEach(i=>addItemRow(i.name,i.qty,i.price));
+  const modes=['none','included','excluded'];
+  document.querySelectorAll('.vat-btn').forEach((b,i)=>b.classList.toggle('active',modes[i]===bill.vatMode));
+  vatMode=bill.vatMode;
+  if(!skipReceiptAndForecast&&bill.receiptImg){
+    receiptDataURL=bill.receiptImg;
+    document.getElementById('receipt-preview-img').src=bill.receiptImg;
+    document.getElementById('receipt-preview-wrap').style.display='block';
+  }else{
+    clearReceipt();
+  }
+  const fc=!skipReceiptAndForecast&&bill.forecast;
+  document.getElementById('forecast-toggle').checked=!!fc;
+  document.getElementById('forecast-fields').style.display=fc?'block':'none';
+  document.getElementById('fc-interval').value=fc?fc.interval:'';
+  document.getElementById('fc-unit').value=fc?fc.unit:'month';
+  calcTotals();
 }
 
 // ═══════════════════════════════════════════════
@@ -1708,7 +1801,10 @@ function saveBill(){
 // ═══════════════════════════════════════════════
 function renderBills(){
   const mo=document.getElementById('bills-month').value;
+  const qEl=document.getElementById('bills-search');
+  const q=(qEl?qEl.value:'').trim().toLowerCase();
   let bills=loadBills();if(mo) bills=bills.filter(b=>b.date.startsWith(mo));
+  if(q) bills=bills.filter(b=>(b.vendor||'').toLowerCase().includes(q)||b.items.some(i=>(i.name||'').toLowerCase().includes(q)));
   const list=document.getElementById('bill-list');
   if(!bills.length){list.innerHTML='<div class="no-data">ไม่มีรายการ</div>';return;}
   list.innerHTML=bills.map(b=>{
@@ -1719,8 +1815,10 @@ function renderBills(){
           <div class="bill-title">▶ ${esc(b.vendor||'ไม่ระบุ')} <span class="cat-badge cat-${cat.cls}">${esc(cat.cat)}</span></div>
           <div class="bill-meta">${fmtDate(b.date)} · ${b.items.length} รายการ</div>
         </div>
-        <div style="display:flex;align-items:center;gap:6px">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           <span class="bill-total">${fmtB(b.grand)}</span>
+          <button onclick="event.stopPropagation();editBill(${b.id})" class="btn-sm" style="font-size:11px">✎ แก้ไข</button>
+          <button onclick="event.stopPropagation();duplicateBill(${b.id})" class="btn-sm" style="font-size:11px">⎘ ทำซ้ำ</button>
           <button onclick="event.stopPropagation();downloadReceipt(${b.id})" class="btn-sm" style="font-size:11px">⬇ JPEG</button>
           <button onclick="event.stopPropagation();deleteBill(${b.id})" class="btn-danger-sm">ลบ</button>
         </div>
@@ -1881,9 +1979,22 @@ function renderReport(){
   const vs=Object.entries(vm).sort((a,b)=>b[1]-a[1]),mv=vs[0]?.[1]||1;
   const cm={};bills.forEach(b=>b.items.forEach(i=>{if(!cm[i.name])cm[i.name]=0;cm[i.name]+=i.qty*i.price;}));
   const cs=Object.entries(cm).sort((a,b)=>b[1]-a[1]).slice(0,8),mc=cs[0]?.[1]||1;
+  // เทียบกับเดือนก่อนหน้า (MoM) — ใช้ได้เมื่อเลือกเดือนเฉพาะ
+  let momHtml='';
+  if(mo){
+    const[y,m]=mo.split('-').map(Number);
+    const prevD=new Date(y,m-2,1);
+    const prevKey=prevD.getFullYear()+'-'+String(prevD.getMonth()+1).padStart(2,'0');
+    const prevTotal=loadBills().filter(b=>b.date.startsWith(prevKey)).reduce((s,b)=>s+b.grand,0);
+    if(prevTotal>0){
+      const diff=tGrand-prevTotal,pct=Math.round(diff/prevTotal*100);
+      momHtml=`<div style="font-size:12px;margin-bottom:1rem;color:${diff>0?'var(--err)':'var(--matcha)'}">${diff>0?'▲':'▼'} ${Math.abs(pct)}% เทียบเดือนก่อน (${fmtB(prevTotal)})</div>`;
+    }
+  }
   el.innerHTML=`<div class="stat-grid g2">
     <div class="stat-card"><div class="stat-lbl">บิลทั้งหมด</div><div class="stat-val">${bills.length}</div></div>
     <div class="stat-card"><div class="stat-lbl">ค่าใช้จ่ายรวม</div><div class="stat-val red">${fmtB(tGrand)}</div></div></div>
+    ${momHtml}
     ${tVat>0?`<div style="font-size:12px;color:var(--ink3);margin-bottom:1rem">VAT รวม: ${fmtB(tVat)}</div>`:''}
     <div class="sub-lbl" style="margin-bottom:10px">ผู้จัดจำหน่าย</div>
     ${vs.map(([v,n])=>`<div class="chart-bar-wrap"><div class="chart-label"><span>${v}</span><span>${fmtB(n)}</span></div><div class="chart-bar-bg"><div class="chart-bar-fill red" style="width:${Math.round(n/mv*100)}%"></div></div></div>`).join('')}
@@ -1915,25 +2026,36 @@ function renderDashboard(){
     <div class="chart-label"><span>รายจ่าย</span><span>${fmtB(expense)}</span></div>
     <div class="chart-bar-bg"><div class="chart-bar-fill red" style="width:${revenue?Math.min(Math.round(expense/revenue*100),100):0}%"></div></div>
   </div>`;
-  // expense by category
+  // expense by category — จัดหมวดเป็นรายรายการจริง ไม่ใช้แค่รายการแรกของบิล
   const catMap={};
   bills.forEach(b=>{
-    const cat=classifyBill(b);
-    if(!catMap[cat.cat])catMap[cat.cat]={cls:cat.cls,total:0,count:0};
-    catMap[cat.cat].total+=b.grand;catMap[cat.cat].count++;
+    const bd=billCatBreakdown(b);
+    Object.entries(bd).forEach(([cat,v])=>{
+      if(!catMap[cat])catMap[cat]={cls:v.cls,total:0,count:0};
+      catMap[cat].total+=v.total;catMap[cat].count++;
+    });
   });
   const catSorted=Object.entries(catMap).sort((a,b)=>b[1].total-a[1].total);
   const maxCat=catSorted[0]?.[1].total||1;
   const expEl=document.getElementById('dash-exp-cat');
   if(!catSorted.length){expEl.innerHTML='<div class="no-data">ไม่มีข้อมูลค่าใช้จ่าย</div>';return;}
-  expEl.innerHTML=catSorted.map(([cat,v])=>`
-    <div class="chart-bar-wrap">
+  const budget=loadBudget();
+  expEl.innerHTML=catSorted.map(([cat,v])=>{
+    const b=budget[cat]||0;
+    let budgetLine='';
+    if(mo&&b>0){
+      const pct=Math.round(v.total/b*100),over=v.total>b;
+      budgetLine=`<div style="font-size:11px;margin-top:2px;color:${over?'var(--err)':'var(--ink3)'}">งบ ${fmtB(b)} · ใช้ไป ${pct}%${over?' (เกินงบ)':''}</div>`;
+    }
+    return`<div class="chart-bar-wrap">
       <div class="chart-label">
-        <span><span class="cat-badge cat-${v.cls}">${cat}</span> (${v.count} บิล)</span>
+        <span><span class="cat-badge cat-${v.cls}">${cat}</span> (${v.count} รายการ)</span>
         <span>${fmtB(v.total)}</span>
       </div>
       <div class="chart-bar-bg"><div class="chart-bar-fill red" style="width:${Math.round(v.total/maxCat*100)}%"></div></div>
-    </div>`).join('');
+      ${budgetLine}
+    </div>`;
+  }).join('');
 }
 
 // ═══════════════════════════════════════════════
@@ -1948,6 +2070,7 @@ function loadSettingsUI(){
   renderGoalSettings();renderSettings();
   renderProdImgList();
   loadPaySettingsUI();
+  renderBudgetSettings();renderCatRulesSettings();
 }
 function saveGlobalSettings(){const gs=loadGS();gs.salesperson=document.getElementById('setting-salesperson').value.trim();saveGS(gs);showToast('บันทึกแล้ว ✓');}
 function addGoal(){
@@ -1963,6 +2086,49 @@ function renderGoalSettings(){
   el.innerHTML=keys.map(k=>{const[y,m]=k.split('-');return`<div class="entry-row"><span style="font-size:13px;font-weight:600">${TH[parseInt(m)]} ${y}</span><div class="er"><span style="font-size:14px;font-weight:600;color:var(--matcha)">฿${goals[k].toLocaleString()}</span><button class="btn-del" onclick="deleteGoal('${k}')">✕</button></div></div>`;}).join('');
 }
 function deleteGoal(k){const g=loadGoals();delete g[k];saveGoals(g);renderGoalSettings();showToast('ลบแล้ว');}
+
+// ── งบประมาณค่าใช้จ่ายรายเดือน (ต่อหมวดหมู่) ──
+function renderBudgetSettings(){
+  const el=document.getElementById('budget-settings-list');if(!el)return;
+  const budget=loadBudget();
+  el.innerHTML=CAT_RULES.map((r,idx)=>`
+    <div class="setting-field" style="margin-bottom:8px">
+      <label>${esc(r.cat)}</label>
+      <input type="number" min="0" placeholder="0" value="${budget[r.cat]||''}" onchange="updateBudgetByIdx(${idx},this.value)">
+    </div>`).join('');
+}
+function updateBudgetByIdx(idx,val){
+  if(!CAT_RULES[idx])return;
+  const cat=CAT_RULES[idx].cat;
+  const b=loadBudget();const amt=parseFloat(val);
+  if(amt>0) b[cat]=amt; else delete b[cat];
+  saveBudget(b);showToast('บันทึกงบแล้ว ✓');
+}
+
+// ── หมวดหมู่ค่าใช้จ่าย (แก้คีย์เวิร์ด / เพิ่มหมวดใหม่) ──
+function renderCatRulesSettings(){
+  const el=document.getElementById('catrules-list');if(!el)return;
+  el.innerHTML=CAT_RULES.map((r,idx)=>`
+    <div class="setting-field" style="margin-bottom:8px">
+      <label>${esc(r.cat)}</label>
+      <input type="text" value="${esc(r.kw.join(', '))}" onchange="updateCatKw(${idx},this.value)">
+    </div>`).join('');
+}
+function updateCatKw(idx,val){
+  if(!CAT_RULES[idx])return;
+  CAT_RULES[idx].kw=val.split(',').map(s=>s.trim()).filter(Boolean);
+  saveCatRules();showToast('บันทึกแล้ว ✓');
+}
+function addCatRule(){
+  const name=document.getElementById('new-cat-name').value.trim();
+  const kwRaw=document.getElementById('new-cat-kw').value.trim();
+  if(!name||!kwRaw){showToast('กรอกให้ครบ');return;}
+  if(CAT_RULES.some(r=>r.cat===name)){showToast('มีหมวดนี้อยู่แล้ว');return;}
+  CAT_RULES.push({cat:name,cls:name,kw:kwRaw.split(',').map(s=>s.trim()).filter(Boolean)});
+  saveCatRules();
+  document.getElementById('new-cat-name').value='';document.getElementById('new-cat-kw').value='';
+  renderCatRulesSettings();renderBudgetSettings();showToast('เพิ่มแล้ว ✓');
+}
 function renderSettings(){
   const cat=loadCat();const list=document.getElementById('model-list');list.innerHTML='';
   Object.keys(cat).forEach(model=>{
@@ -2020,10 +2186,12 @@ async function addColor(model){
         showToast(`เพิ่ม ${c} + สต็อก Main:${mainStock} Defect:${defectStock} ✓`);
       }catch(e){
         // rollback catalog
+        console.error('addColor failed:',e);
         const cat2=loadCat();
         cat2[model].colors=cat2[model].colors.filter(x=>x!==c);
         delete cat2[model].prices[c];saveCat(cat2);renderSettings();
-        showToast('เกิดข้อผิดพลาด ยกเลิกการเพิ่มสี');
+        const detail=(e&&e.message)?e.message.slice(0,120):'';
+        showToast('เกิดข้อผิดพลาด ยกเลิกการเพิ่มสี'+(detail?': '+detail:''));
       }
     } else {
       showToast(`เพิ่มสี ${c} แล้ว (มีในสต็อกแล้ว)`);
@@ -2155,6 +2323,7 @@ function resetBillForm(){
   document.getElementById('bill-total-section').style.display='none';document.getElementById('btn-save-bill').disabled=true;
   document.querySelectorAll('.vat-btn').forEach((b,i)=>b.classList.toggle('active',i===0));
   vatMode='none';clearReceipt();addItemRow();
+  editingBillId=null;document.getElementById('btn-save-bill').textContent='บันทึกบิล';
 }
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);}
 
@@ -2957,9 +3126,11 @@ function exportExpenseCSV(){
   if(!bills.length){showToast('ไม่มีข้อมูล');return;}
   const rows=[['วันที่','รายการ','หมวดหมู่','จำนวนเงิน','VAT','รวม','ผู้จัดจำหน่าย']];
   bills.forEach(b=>{
-    const cat=classifyBill(b);
-    b.items.forEach(i=>rows.push([b.date,i.name,cat.cat,fmtB(i.qty*i.price),
-      b.vatMode==='none'?'ไม่มี':b.vatMode==='included'?'รวมแล้ว':'7%',fmtB(b.grand),b.vendor]));
+    b.items.forEach(i=>{
+      const cat=classifyItem(i.name);
+      rows.push([b.date,i.name,cat.cat,fmtB(i.qty*i.price),
+        b.vatMode==='none'?'ไม่มี':b.vatMode==='included'?'รวมแล้ว':'7%',fmtB(b.grand),b.vendor]);
+    });
   });
   const csv='\uFEFF'+rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
   const a=document.createElement('a');
