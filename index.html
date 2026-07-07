@@ -45,6 +45,11 @@ body{font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN',-apple-system,sans-
 .section{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:1.125rem 1.125rem 1.125rem 1.375rem;margin-bottom:.875rem;position:relative}
 .section::before{content:'';position:absolute;left:0;top:.875rem;bottom:.875rem;width:3px;background:var(--primary);border-radius:0 2px 2px 0}
 .sec-title{font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:.875rem;letter-spacing:.08em;text-transform:uppercase}
+.sec-title.sec-toggle{cursor:pointer;display:flex;align-items:center;justify-content:space-between;margin-bottom:0;user-select:none}
+.sec-title.sec-toggle .sec-arrow{font-size:10px;transition:transform .15s;color:var(--ink3)}
+.sec-title.sec-toggle.open .sec-arrow{transform:rotate(90deg)}
+.sec-body{display:none}
+.sec-body.open{display:block;margin-top:.875rem}
 .page{display:none}.page.active{display:block}
 /* ── TABS (sub) ── */
 .tabs{display:flex;border-bottom:1px solid var(--bd);margin-bottom:1.25rem;overflow-x:auto}
@@ -720,33 +725,42 @@ select:disabled{opacity:.35;cursor:not-allowed}
 <!-- ════════════════════ SETTINGS ════════════════════ -->
 <div class="page" id="nav-cfg">
   <div class="section">
-    <div class="sec-title">โหมดกลางคืน</div>
+    <div class="sec-title sec-toggle" onclick="toggleSecBody(this)">โหมดกลางคืน<span class="sec-arrow">▸</span></div>
+    <div class="sec-body">
     <div style="display:flex;align-items:center;justify-content:space-between">
       <span style="font-size:13px;color:var(--ink2)">Dark Mode</span>
       <label class="toggle"><input type="checkbox" id="dark-mode-toggle" onchange="toggleDarkMode()"><span class="toggle-slider"></span></label>
     </div>
+    </div>
   </div>
   <div class="section">
-    <div class="sec-title">Export</div>
+    <div class="sec-title sec-toggle" onclick="toggleSecBody(this)">Export<span class="sec-arrow">▸</span></div>
+    <div class="sec-body">
     <div class="setting-field"><label>พนักงานขาย</label><input type="text" id="setting-salesperson" placeholder="ชื่อ"></div>
     <button class="btn-primary" style="margin-top:0" onclick="saveGlobalSettings()">บันทึก</button>
+    </div>
   </div>
   <div class="section">
-    <div class="sec-title">เป้าหมายยอดขายรายเดือน</div>
+    <div class="sec-title sec-toggle" onclick="toggleSecBody(this)">เป้าหมายยอดขายรายเดือน<span class="sec-arrow">▸</span></div>
+    <div class="sec-body">
     <div id="goal-settings-list"></div>
     <div class="add-row" style="margin-top:8px">
       <select id="goal-month-input" style="flex:1;padding:8px 10px;border:1px solid var(--bd);border-radius:var(--r);font-size:13px;font-family:inherit;outline:none;background:var(--sf)"></select>
       <input type="number" id="goal-amount-input" placeholder="ยอดเป้า" min="0" style="flex:1">
       <button class="btn-add" onclick="addGoal()">+ เพิ่ม</button>
     </div>
+    </div>
   </div>
   <div class="section">
-    <div class="sec-title">งบประมาณค่าใช้จ่ายรายเดือน (ต่อหมวดหมู่)</div>
+    <div class="sec-title sec-toggle" onclick="toggleSecBody(this)">งบประมาณค่าใช้จ่ายรายเดือน (ต่อหมวดหมู่)<span class="sec-arrow">▸</span></div>
+    <div class="sec-body">
     <p style="font-size:12px;color:var(--ink3);margin-bottom:10px">ตั้งงบต่อหมวด ระบบจะใช้เทียบกับยอดจริงในหน้าแดชบอร์ด (ต้องเลือกเดือนใดเดือนหนึ่ง)</p>
     <div id="budget-settings-list"></div>
+    </div>
   </div>
   <div class="section">
-    <div class="sec-title">หมวดหมู่ค่าใช้จ่าย</div>
+    <div class="sec-title sec-toggle" onclick="toggleSecBody(this)">หมวดหมู่ค่าใช้จ่าย<span class="sec-arrow">▸</span></div>
+    <div class="sec-body">
     <p style="font-size:12px;color:var(--ink3);margin-bottom:10px">แก้คีย์เวิร์ดของแต่ละหมวด (คั่นด้วยจุลภาค) หรือเพิ่มหมวดใหม่ ระบบใช้จับคู่ชื่อรายการอัตโนมัติ</p>
     <div id="catrules-list"></div>
     <div class="new-model-row" style="margin-top:8px">
@@ -754,15 +768,19 @@ select:disabled{opacity:.35;cursor:not-allowed}
       <input type="text" id="new-cat-kw" placeholder="คีย์เวิร์ด คั่นด้วย ,">
       <button class="btn-add" onclick="addCatRule()">+ เพิ่ม</button>
     </div>
+    </div>
   </div>
   <div class="section">
-    <div class="sec-title">Model / สี / ราคา</div>
+    <div class="sec-title sec-toggle" onclick="toggleSecBody(this)">Model / สี / ราคา<span class="sec-arrow">▸</span></div>
+    <div class="sec-body">
     <div id="model-list"></div>
     <div class="new-model-row"><input type="text" id="new-model-input" placeholder="ชื่อ Model ใหม่"><button class="btn-add" onclick="addModel()">+ เพิ่ม</button></div>
+    </div>
   </div>
 
   <div class="section">
-    <div class="sec-title">รูปสินค้า (สำหรับสรุปยอด)</div>
+    <div class="sec-title sec-toggle" onclick="toggleSecBody(this)">รูปสินค้า (สำหรับสรุปยอด)<span class="sec-arrow">▸</span></div>
+    <div class="sec-body">
     <p style="font-size:12px;color:var(--ink3);margin-bottom:12px">อัปโหลดรูปพร้อมระบุ Model+สี ระบบจะจับคู่อัตโนมัติ</p>
     <div id="prod-img-list" style="margin-bottom:10px"></div>
     <div style="padding:12px;background:var(--sf2);border-radius:var(--r);border:1px solid var(--bd)">
@@ -779,10 +797,12 @@ select:disabled{opacity:.35;cursor:not-allowed}
       </div>
       <button class="btn-add" style="width:100%;padding:9px;text-align:center" onclick="addProdImg()">+ เพิ่มรูปสินค้า</button>
     </div>
+    </div>
   </div>
 
   <div class="section">
-    <div class="sec-title">บัญชีธนาคารและ QR Code</div>
+    <div class="sec-title sec-toggle" onclick="toggleSecBody(this)">บัญชีธนาคารและ QR Code<span class="sec-arrow">▸</span></div>
+    <div class="sec-body">
     <div class="field" style="margin-bottom:10px"><label>ธนาคาร</label>
       <input type="text" id="pay-bank-brand" placeholder="เช่น กสิกรไทย, ไทยพาณิชย์" style="font-size:15px">
     </div>
@@ -800,15 +820,18 @@ select:disabled{opacity:.35;cursor:not-allowed}
       <input type="file" id="pay-qr-file" accept="image/*" style="display:none" onchange="previewPayQR(this)">
     </div>
     <button class="btn-primary" style="margin-top:.5rem" onclick="savePaymentSettings()">บันทึกข้อมูลบัญชี</button>
+    </div>
   </div>
   <div class="section">
-    <div class="sec-title">สำรองข้อมูล / กู้คืน</div>
+    <div class="sec-title sec-toggle" onclick="toggleSecBody(this)">สำรองข้อมูล / กู้คืน<span class="sec-arrow">▸</span></div>
+    <div class="sec-body">
     <div style="font-size:12px;color:var(--ink3);margin-bottom:10px">ดาวน์โหลดข้อมูลทั้งหมด (ยอดขาย, สต็อกสินค้า, บิลค่าใช้จ่าย, ตั้งค่า) เก็บไว้เผื่อกู้คืน</div>
     <button class="btn-primary" onclick="exportFullBackup()">⬇ ดาวน์โหลด Backup ทั้งหมด</button>
     <div class="upload-box" style="margin-top:10px" onclick="document.getElementById('restore-file').click()">
       📂 กู้คืนจากไฟล์ Backup (.json)
       <span style="font-size:11px;display:block;margin-top:3px;color:var(--ink3)">จะเขียนทับข้อมูลปัจจุบันทั้งหมด</span>
       <input type="file" id="restore-file" accept=".json" style="display:none" onchange="importFullBackup(this)">
+    </div>
     </div>
   </div>
 </div>
@@ -2174,6 +2197,11 @@ function renderSettings(){
 }
 function saveBasePrice(m){const v=parseInt(document.getElementById('bp-'+m).value);if(!v)return;const cat=loadCat();cat[m].basePrice=v;saveCat(cat);showToast('บันทึกแล้ว ✓');}
 function toggleModel(h){const b=h.nextElementSibling,op=b.classList.toggle('open');h.querySelector('.model-name').textContent=(op?'▼ ':'▶ ')+h.querySelector('.model-name').textContent.slice(2);}
+function toggleSecBody(h){
+  const body=h.nextElementSibling;
+  const op=body.classList.toggle('open');
+  h.classList.toggle('open',op);
+}
 function addModel(){const n=document.getElementById('new-model-input').value.trim();if(!n)return;const cat=loadCat();if(cat[n]){showToast('มีอยู่แล้ว');return;}cat[n]={basePrice:0,colors:[],prices:{}};saveCat(cat);document.getElementById('new-model-input').value='';renderSettings();const body=document.getElementById('body-'+n);if(body){body.classList.add('open');const nameEl=body.previousElementSibling?.querySelector('.model-name');if(nameEl)nameEl.textContent='▼ '+nameEl.textContent.slice(2);}showToast('เพิ่มแล้ว ✓ — เลื่อนลงไปเพิ่มสี/ราคาได้เลย');}
 function deleteModel(m){if(!confirm('ลบ "'+m+'"?'))return;const cat=loadCat();delete cat[m];saveCat(cat);renderSettings();showToast('ลบแล้ว');}
 async function addColor(model){
