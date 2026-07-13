@@ -3006,37 +3006,82 @@ let manualOrderQty={};
 // ถ้ายอดขายจริงเกิน 100 ใบ/เดือน จะปรับ "คาดใช้/เดือน" ขึ้นตามสัดส่วน แต่ไม่มีการปรับลงต่ำกว่ามาตรฐาน
 const FORECAST_BASE_STANDARD=100;
 
+// base100 เก็บใน localStorage (ต่อเบราว์เซอร์/เครื่อง) — ยังไม่มีคอลัมน์ใน Supabase
+// ถ้าอยากให้ sync ข้ามเครื่องได้ ต้องรัน SQL นี้ใน Supabase SQL editor ก่อน แล้วค่อยย้าย logic มาอ่าน/เขียนคอลัมน์จริง:
+//   ALTER TABLE inventory ADD COLUMN base100 integer;
 function getBase100Map(){
   try{return JSON.parse(localStorage.getItem('fc_base100')||'{}');}catch(e){return{};}
 }
 function setBase100Map(m){localStorage.setItem('fc_base100',JSON.stringify(m));}
 
-// ยอดขายจริง/เดือน = จำนวน "ใบ" (qty) รวมของทุก transaction ในเดือนนั้น ไม่ใช่การนับตัวอักษร
+function exportBase100Config(){
+  const data=JSON.stringify(getBase100Map(),null,2);
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));
+  a.download='forecast_base100_backup.json';a.click();
+  showToast('สำรองค่ามาตรฐานแล้ว ✓');
+}
+function importBase100Config(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const data=JSON.parse(e.target.result);
+      setBase100Map(data);
+      showToast('นำเข้าค่ามาตรฐานแล้ว ✓');
+      renderForecast();
+    }catch(err){showToast('ไฟล์ไม่ถูกต้อง');}
+  };
+  reader.readAsText(file);
+  input.value='';
+}
+
+// นับเฉพาะ order ที่มีชื่อลูกค้า (custName) เพราะมีแต่ order แบบนี้เท่านั้นที่ใช้ลูกปัดตัวอักษร
 function getRealMonthlyQty(monthKey){
   const ents=loadEnt();
-  return ents.filter(e=>e.date.startsWith(monthKey)).reduce((s,e)=>s+(e.qty||1),0);
+  return ents.filter(e=>e.date.startsWith(monthKey)&&e.custName).reduce((s,e)=>s+(e.qty||1),0);
+}
+
+// ประมาณยอดขายทั้งเดือนจาก pace ของยอดสะสมถึงวันนี้ (ตรงกว่าการดูยอดสะสมดิบๆ ตอนต้นเดือน)
+function getProjectedMonthlyQty(monthKey,now){
+  const mtd=getRealMonthlyQty(monthKey);
+  const [y,m]=monthKey.split('-').map(Number);
+  const daysInMonth=new Date(y,m,0).getDate();
+  const isCurrentMonth=now.getFullYear()===y&&(now.getMonth()+1)===m;
+  const dayOfMonth=isCurrentMonth?now.getDate():daysInMonth;
+  const projected=dayOfMonth>0?Math.round(mtd/dayOfMonth*daysInMonth):mtd;
+  return{mtd,projected,dayOfMonth,daysInMonth};
 }
 
 async function updateForecastFromSales(){
   const now=new Date();
   const nowKey=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
-  const realMonthly=getRealMonthlyQty(nowKey);
-  if(realMonthly<=FORECAST_BASE_STANDARD){
-    showToast(`ยอดขายเดือนนี้ (${realMonthly} ใบ) ยังไม่ถึงมาตรฐาน ${FORECAST_BASE_STANDARD} ใบ — ไม่ปรับ Forecast`);
+  const{mtd,projected}=getProjectedMonthlyQty(nowKey,now);
+  if(projected<=FORECAST_BASE_STANDARD){
+    showToast(`คาดยอดขายเดือนนี้ (${projected} ใบ) ยังไม่ถึงมาตรฐาน ${FORECAST_BASE_STANDARD} ใบ — ไม่ปรับ Forecast`);
     return;
   }
   const alphaItems=invData.filter(i=>i.name_normalized.includes('alphabet'));
   if(!alphaItems.length){showToast('ไม่มีสินค้า Alphabet');return;}
-  const scale=realMonthly/FORECAST_BASE_STANDARD;
+  const scale=projected/FORECAST_BASE_STANDARD;
+  const pct=Math.round((scale-1)*100);
+  if(!confirm(`ยอดขายสะสมเดือนนี้ ${mtd} ใบ · คาดทั้งเดือน ${projected} ใบ (มาตรฐาน ${FORECAST_BASE_STANDARD})\nจะปรับ "คาดใช้/เดือน" ของสินค้า Alphabet ทั้งหมด ${alphaItems.length} รายการ ขึ้น +${pct}%\n\nยืนยันหรือไม่?`)) return;
   const base100=getBase100Map();
-  for(const item of alphaItems){
+  const changes=[];
+  alphaItems.forEach(item=>{
     const base=base100[item.name_normalized]??(item.alert_level||0);
     base100[item.name_normalized]=base; // กันไว้เผื่อยังไม่เคยบันทึก
-    item.alert_level=Math.round(base*scale);
-    await saveInvToSB(item);
-  }
+    const oldLevel=item.alert_level||0;
+    const newLevel=Math.round(base*scale);
+    item.alert_level=newLevel;
+    changes.push({item,oldLevel,newLevel});
+  });
   setBase100Map(base100);
-  showToast(`อัพเดต Forecast แล้ว ✓ (+${Math.round((scale-1)*100)}%)`);
+  await Promise.all(changes.map(async c=>{
+    await saveInvToSB(c.item);
+    await logInvTx(c.item.name,'FORECAST_ADJUST',c.item.main_stock,c.item.main_stock,c.item.defect_stock,c.item.defect_stock,c.newLevel-c.oldLevel,'forecast-scale',`+${pct}%`);
+  }));
+  showToast(`อัพเดต Forecast แล้ว ✓ (+${pct}%)`);
   renderForecast();
 }
 
@@ -3068,18 +3113,25 @@ function renderForecast(){
   const alphaItems=invData.filter(i=>i.name_normalized.includes('alphabet'))
     .sort((a,b)=>a.name_normalized.localeCompare(b.name_normalized));
 
-  // ยอดขายจริงรวมทุกสินค้าเดือนนี้ (จำนวน "ใบ") เทียบกับมาตรฐาน 100 ใบ/เดือน
-  const realMonthly=getRealMonthlyQty(nowKey);
-  const canUpdate=realMonthly>FORECAST_BASE_STANDARD;
-  const pct=Math.round((Math.max(realMonthly,FORECAST_BASE_STANDARD)/FORECAST_BASE_STANDARD-1)*100);
+  // ยอดขายรวมทุก order ที่มีชื่อลูกค้าเดือนนี้ (จำนวน "ใบ") เทียบกับมาตรฐาน 100 ใบ/เดือน
+  // ใช้ pace ของยอดสะสมถึงวันนี้มาประมาณยอดทั้งเดือน แม่นกว่าดูยอดสะสมดิบๆ ตอนต้นเดือน
+  const{mtd,projected,dayOfMonth,daysInMonth}=getProjectedMonthlyQty(nowKey,now);
+  const canUpdate=projected>FORECAST_BASE_STANDARD;
+  const pct=Math.round((Math.max(projected,FORECAST_BASE_STANDARD)/FORECAST_BASE_STANDARD-1)*100);
   const sumEl=document.getElementById('forecast-sales-summary');
   if(sumEl){
     sumEl.innerHTML=`<div style="border:1px solid var(--bd);border-radius:var(--r);padding:10px 12px;background:var(--sf2);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
       <div style="font-size:12px;color:var(--ink2)">
-        ยอดขายจริงเดือนนี้: <b style="color:var(--ink)">${realMonthly}</b> ใบ · มาตรฐานฐาน: <b>${FORECAST_BASE_STANDARD}</b> ใบ/เดือน
+        ยอดสะสมเดือนนี้ (วันที่ ${dayOfMonth}/${daysInMonth}): <b style="color:var(--ink)">${mtd}</b> ใบ · คาดทั้งเดือน: <b style="color:var(--ink)">${projected}</b> ใบ · มาตรฐานฐาน: <b>${FORECAST_BASE_STANDARD}</b> ใบ/เดือน
         ${canUpdate?`<span style="color:var(--err);font-weight:600"> (+${pct}%)</span>`:`<span style="color:var(--ink3)"> — ยังไม่ถึงมาตรฐาน ไม่ต้องปรับ</span>`}
       </div>
-      <button class="btn-sm" ${canUpdate?'':'disabled style="opacity:.4;cursor:not-allowed"'} onclick="updateForecastFromSales()">🔄 อัพเดต Forecast${canUpdate?` +${pct}%`:''}</button>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn-sm" ${canUpdate?'':'disabled style="opacity:.4;cursor:not-allowed"'} onclick="updateForecastFromSales()">🔄 อัพเดต Forecast${canUpdate?` +${pct}%`:''}</button>
+        <button class="btn-sm" onclick="exportBase100Config()" title="สำรองค่ามาตรฐาน 100 เป็นไฟล์ (ย้ายไปเปิดเครื่องอื่นได้)">💾 Backup</button>
+        <label class="btn-sm" style="cursor:pointer;display:inline-flex;align-items:center" title="นำเข้าค่ามาตรฐานจากไฟล์ backup">📂 Restore
+          <input type="file" accept="application/json" style="display:none" onchange="importBase100Config(this)">
+        </label>
+      </div>
     </div>`;
   }
 
@@ -3101,16 +3153,17 @@ function renderForecast(){
   }).sort((a,b)=>b.recommended-a.recommended);
 
   const stickyCol='position:sticky;left:0;background:var(--sf);box-shadow:2px 0 4px -2px rgba(0,0,0,.2)';
-  el.innerHTML=`<div style="overflow-x:auto">
+  const stickyHead='position:sticky;top:0;background:var(--sf);z-index:3';
+  el.innerHTML=`<div style="overflow:auto;max-height:60vh;border:1px solid var(--bd2);border-radius:var(--r)">
   <table class="data-table" style="font-size:12px;min-width:560px">
     <thead><tr>
-      <th style="${stickyCol};z-index:2">สินค้า</th>
-      <th style="text-align:right">สต็อก</th>
-      <th style="text-align:right">ใช้จริง/ด. (ตัวอักษร)</th>
-      <th style="text-align:right">คาดใช้/เดือน</th>
-      <th style="text-align:right">Forecast</th>
-      <th style="text-align:right">ควรสั่ง</th>
-      <th style="text-align:right">จะสั่ง</th>
+      <th style="${stickyCol};${stickyHead}">สินค้า</th>
+      <th style="text-align:right;${stickyHead}">สต็อก</th>
+      <th style="text-align:right;${stickyHead}">ใช้จริง/ด. (ตัวอักษร)</th>
+      <th style="text-align:right;${stickyHead}">คาดใช้/เดือน</th>
+      <th style="text-align:right;${stickyHead}">Forecast</th>
+      <th style="text-align:right;${stickyHead}">ควรสั่ง</th>
+      <th style="text-align:right;${stickyHead}">จะสั่ง</th>
     </tr></thead>
     <tbody>${rows.map(r=>`<tr>
       <td style="${stickyCol};z-index:1;font-weight:${r.recommended>0?'600':'400'};white-space:nowrap">${esc(r.name)}</td>
@@ -3152,7 +3205,15 @@ function exportForecastCSV(){
   }
   const alphaItems=invData.filter(i=>i.name_normalized.includes('alphabet'))
     .sort((a,b)=>a.name_normalized.localeCompare(b.name_normalized));
-  const rows=[['สินค้า','สต็อกปัจจุบัน','ขายจริง/เดือน','คาดใช้/เดือน',`ระยะ Forecast (เดือน)`,`Forecast Demand`,'ควรสั่ง','จะสั่ง']];
+  const nowKey=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  const{mtd,projected,dayOfMonth,daysInMonth}=getProjectedMonthlyQty(nowKey,now);
+  const rows=[
+    [`ยอดสะสมเดือนนี้ (วันที่ ${dayOfMonth}/${daysInMonth})`,mtd+' ใบ'],
+    ['คาดทั้งเดือน',projected+' ใบ'],
+    ['มาตรฐานฐาน',FORECAST_BASE_STANDARD+' ใบ/เดือน'],
+    [],
+    ['สินค้า','สต็อกปัจจุบัน','ใช้จริง/ด. (ตัวอักษร)','คาดใช้/เดือน',`ระยะ Forecast (เดือน)`,`Forecast Demand`,'ควรสั่ง','จะสั่ง']
+  ];
   alphaItems.map(item=>{
     const sm=salesMap[item.name_normalized];
     const mqtys=sm?Object.values(sm.months):[];
@@ -3188,8 +3249,8 @@ async function renderLog(){
     if(search) logs=logs.filter(l=>l.product_name?.toLowerCase().includes(search));
     const el=document.getElementById('log-list');if(!el)return;
     if(!logs.length){el.innerHTML='<div class="no-data">ไม่มีประวัติ</div>';return;}
-    const typeLabel={SALE:'ขาย',RESTORE:'คืน',ADJUST:'แก้ไข',MOVE_DEFECT:'→Defect',MOVE_MAIN:'→Main',INIT:'เริ่มต้น',IMPORT:'นำเข้า'};
-    const typeCls={SALE:'log-sale',RESTORE:'log-restore',ADJUST:'log-adjust',MOVE_DEFECT:'log-move',MOVE_MAIN:'log-move',INIT:'log-adjust',IMPORT:'log-adjust'};
+    const typeLabel={SALE:'ขาย',RESTORE:'คืน',ADJUST:'แก้ไข',MOVE_DEFECT:'→Defect',MOVE_MAIN:'→Main',INIT:'เริ่มต้น',IMPORT:'นำเข้า',FORECAST_ADJUST:'ปรับ Forecast'};
+    const typeCls={SALE:'log-sale',RESTORE:'log-restore',ADJUST:'log-adjust',MOVE_DEFECT:'log-move',MOVE_MAIN:'log-move',INIT:'log-adjust',IMPORT:'log-adjust',FORECAST_ADJUST:'log-adjust'};
     el.innerHTML=logs.map(l=>`<div class="log-row">
       <div style="display:flex;flex-direction:column;gap:3px;flex:1">
         <span style="font-size:13px;font-weight:600">${esc(l.product_name)}</span>
