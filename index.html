@@ -3100,10 +3100,11 @@ function renderForecast(){
     return{id:item.id,norm:item.name_normalized,name:item.name,avgMonthly,monthlyDemand,forecastDemand,currentStock,recommended,orderQty};
   }).sort((a,b)=>b.recommended-a.recommended);
 
+  const stickyCol='position:sticky;left:0;background:var(--sf);box-shadow:2px 0 4px -2px rgba(0,0,0,.2)';
   el.innerHTML=`<div style="overflow-x:auto">
   <table class="data-table" style="font-size:12px;min-width:560px">
     <thead><tr>
-      <th>สินค้า</th>
+      <th style="${stickyCol};z-index:2">สินค้า</th>
       <th style="text-align:right">สต็อก</th>
       <th style="text-align:right">ใช้จริง/ด. (ตัวอักษร)</th>
       <th style="text-align:right">คาดใช้/เดือน</th>
@@ -3112,7 +3113,7 @@ function renderForecast(){
       <th style="text-align:right">จะสั่ง</th>
     </tr></thead>
     <tbody>${rows.map(r=>`<tr>
-      <td style="font-weight:${r.recommended>0?'600':'400'};white-space:nowrap">${esc(r.name)}</td>
+      <td style="${stickyCol};z-index:1;font-weight:${r.recommended>0?'600':'400'};white-space:nowrap">${esc(r.name)}</td>
       <td style="text-align:right;color:${r.currentStock<=0?'var(--err)':'var(--ink)'}">${r.currentStock}</td>
       <td style="text-align:right">${r.avgMonthly}</td>
       <td style="text-align:right">${r.monthlyDemand}</td>
