@@ -572,6 +572,7 @@ select:disabled{opacity:.35;cursor:not-allowed}
         </select>
         <button class="btn-sm" onclick="exportForecastCSV()">⬇ CSV</button>
       </div>
+      <div id="forecast-sales-summary" style="margin-bottom:1rem"></div>
       <div id="forecast-table"><div class="no-data">กำลังคำนวณ...</div></div>
     </div>
   </div>
@@ -2854,7 +2855,12 @@ async function saveAlertLevel(id){
   const val=parseInt(document.getElementById(`alert-${id}`)?.value);
   if(isNaN(val)||val<0)return;
   item.alert_level=val;
-  await saveInvToSB(item);checkLowStock();renderStock();showToast('บันทึก Alert แล้ว ✓');
+  await saveInvToSB(item);
+  // แก้มือ = ตั้งมาตรฐานใหม่ที่ 100 ใบ/เดือน ด้วย กันปุ่มอัพเดตอัตโนมัติทับค่าที่เพิ่งตั้งเอง
+  const base100=getBase100Map();
+  base100[item.name_normalized]=val;
+  setBase100Map(base100);
+  checkLowStock();renderStock();showToast('บันทึก Alert แล้ว ✓');
 }
 
 async function addInvProduct(){
@@ -2995,12 +3001,52 @@ async function importDefaultInventory(){
 // store manual order qty edits (session only, not persisted)
 let manualOrderQty={};
 
+// ── Forecast base-100 scaling ──
+// สมมติฐาน: ตัวเลข "คาดใช้/เดือน" (alert_level) ทุกตัวถูกตั้งไว้บนมาตรฐานยอดขาย 100 ใบ/เดือน
+// ถ้ายอดขายจริงเกิน 100 ใบ/เดือน จะปรับ "คาดใช้/เดือน" ขึ้นตามสัดส่วน แต่ไม่มีการปรับลงต่ำกว่ามาตรฐาน
+const FORECAST_BASE_STANDARD=100;
+
+function getBase100Map(){
+  try{return JSON.parse(localStorage.getItem('fc_base100')||'{}');}catch(e){return{};}
+}
+function setBase100Map(m){localStorage.setItem('fc_base100',JSON.stringify(m));}
+
+// ยอดขายจริง/เดือน = จำนวน "ใบ" (qty) รวมของทุก transaction ในเดือนนั้น ไม่ใช่การนับตัวอักษร
+function getRealMonthlyQty(monthKey){
+  const ents=loadEnt();
+  return ents.filter(e=>e.date.startsWith(monthKey)).reduce((s,e)=>s+(e.qty||1),0);
+}
+
+async function updateForecastFromSales(){
+  const now=new Date();
+  const nowKey=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  const realMonthly=getRealMonthlyQty(nowKey);
+  if(realMonthly<=FORECAST_BASE_STANDARD){
+    showToast(`ยอดขายเดือนนี้ (${realMonthly} ใบ) ยังไม่ถึงมาตรฐาน ${FORECAST_BASE_STANDARD} ใบ — ไม่ปรับ Forecast`);
+    return;
+  }
+  const alphaItems=invData.filter(i=>i.name_normalized.includes('alphabet'));
+  if(!alphaItems.length){showToast('ไม่มีสินค้า Alphabet');return;}
+  const scale=realMonthly/FORECAST_BASE_STANDARD;
+  const base100=getBase100Map();
+  for(const item of alphaItems){
+    const base=base100[item.name_normalized]??(item.alert_level||0);
+    base100[item.name_normalized]=base; // กันไว้เผื่อยังไม่เคยบันทึก
+    item.alert_level=Math.round(base*scale);
+    await saveInvToSB(item);
+  }
+  setBase100Map(base100);
+  showToast(`อัพเดต Forecast แล้ว ✓ (+${Math.round((scale-1)*100)}%)`);
+  renderForecast();
+}
+
 function renderForecast(){
   const periods=parseInt(document.getElementById('fc-period')?.value)||3;
   const el=document.getElementById('forecast-table');if(!el)return;
   const ents=loadEnt();
   const monthsBack=6;
   const now=new Date();
+  const nowKey=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
 
   // คำนวณ avg monthly sales เฉพาะ alphabet
   const salesMap={};
@@ -3022,6 +3068,21 @@ function renderForecast(){
   const alphaItems=invData.filter(i=>i.name_normalized.includes('alphabet'))
     .sort((a,b)=>a.name_normalized.localeCompare(b.name_normalized));
 
+  // ยอดขายจริงรวมทุกสินค้าเดือนนี้ (จำนวน "ใบ") เทียบกับมาตรฐาน 100 ใบ/เดือน
+  const realMonthly=getRealMonthlyQty(nowKey);
+  const canUpdate=realMonthly>FORECAST_BASE_STANDARD;
+  const pct=Math.round((Math.max(realMonthly,FORECAST_BASE_STANDARD)/FORECAST_BASE_STANDARD-1)*100);
+  const sumEl=document.getElementById('forecast-sales-summary');
+  if(sumEl){
+    sumEl.innerHTML=`<div style="border:1px solid var(--bd);border-radius:var(--r);padding:10px 12px;background:var(--sf2);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div style="font-size:12px;color:var(--ink2)">
+        ยอดขายจริงเดือนนี้: <b style="color:var(--ink)">${realMonthly}</b> ใบ · มาตรฐานฐาน: <b>${FORECAST_BASE_STANDARD}</b> ใบ/เดือน
+        ${canUpdate?`<span style="color:var(--err);font-weight:600"> (+${pct}%)</span>`:`<span style="color:var(--ink3)"> — ยังไม่ถึงมาตรฐาน ไม่ต้องปรับ</span>`}
+      </div>
+      <button class="btn-sm" ${canUpdate?'':'disabled style="opacity:.4;cursor:not-allowed"'} onclick="updateForecastFromSales()">🔄 อัพเดต Forecast${canUpdate?` +${pct}%`:''}</button>
+    </div>`;
+  }
+
   if(!alphaItems.length){el.innerHTML='<div class="no-data">ไม่มีสินค้า Alphabet ในสต็อก</div>';return;}
 
   const rows=alphaItems.map(item=>{
@@ -3029,7 +3090,7 @@ function renderForecast(){
     const monthlyQtys=sm?Object.values(sm.months):[];
     const avgMonthly=monthlyQtys.length
       ?parseFloat((monthlyQtys.reduce((s,v)=>s+v,0)/monthsBack).toFixed(1)):0;
-    // จำนวนที่คาดว่าจะใช้ต่อเดือน = เลขที่ตั้งไว้ในช่อง "แจ้งเตือนเมื่อเหลือ ≤" ของหน้าสต็อก
+    // จำนวนที่คาดว่าจะใช้ต่อเดือน = เลขที่ตั้งไว้ในช่อง "แจ้งเตือนเมื่อเหลือ ≤" ของหน้าสต็อก (ปรับอัตโนมัติได้ด้วยปุ่มด้านบน)
     const monthlyDemand=item.alert_level||0;
     const forecastDemand=Math.ceil(monthlyDemand*periods);
     const currentStock=item.main_stock;
@@ -3044,7 +3105,7 @@ function renderForecast(){
     <thead><tr>
       <th>สินค้า</th>
       <th style="text-align:right">สต็อก</th>
-      <th style="text-align:right">ขายจริง/เดือน</th>
+      <th style="text-align:right">ใช้จริง/ด. (ตัวอักษร)</th>
       <th style="text-align:right">คาดใช้/เดือน</th>
       <th style="text-align:right">Forecast</th>
       <th style="text-align:right">ควรสั่ง</th>
@@ -3065,7 +3126,7 @@ function renderForecast(){
     </tr>`).join('')}</tbody>
   </table></div>
   <div style="font-size:11px;color:var(--ink3);margin-top:10px">
-    Forecast = คาดใช้/เดือน (ตั้งค่าที่หน้าสต็อก "แจ้งเตือนเมื่อเหลือ ≤") × ${periods} เดือน · ขายจริง/เดือน คำนวณจากยอดขายย้อนหลัง ${monthsBack} เดือน (แสดงไว้เทียบเท่านั้น)
+    Forecast = คาดใช้/เดือน × ${periods} เดือน · "ใช้จริง/ด. (ตัวอักษร)" คำนวณจากยอดขายย้อนหลัง ${monthsBack} เดือน (แสดงไว้เทียบเท่านั้น ไม่ใช้คำนวณคำสั่งซื้อ)
   </div>`;
 }
 
