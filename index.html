@@ -3029,20 +3029,23 @@ function renderForecast(){
     const monthlyQtys=sm?Object.values(sm.months):[];
     const avgMonthly=monthlyQtys.length
       ?parseFloat((monthlyQtys.reduce((s,v)=>s+v,0)/monthsBack).toFixed(1)):0;
-    const forecastDemand=Math.ceil(avgMonthly*periods);
+    // จำนวนที่คาดว่าจะใช้ต่อเดือน = เลขที่ตั้งไว้ในช่อง "แจ้งเตือนเมื่อเหลือ ≤" ของหน้าสต็อก
+    const monthlyDemand=item.alert_level||0;
+    const forecastDemand=Math.ceil(monthlyDemand*periods);
     const currentStock=item.main_stock;
     const recommended=Math.max(forecastDemand-currentStock,0);
     const orderQty=manualOrderQty[item.name_normalized]!==undefined
       ?manualOrderQty[item.name_normalized]:recommended;
-    return{id:item.id,norm:item.name_normalized,name:item.name,avgMonthly,forecastDemand,currentStock,recommended,orderQty};
+    return{id:item.id,norm:item.name_normalized,name:item.name,avgMonthly,monthlyDemand,forecastDemand,currentStock,recommended,orderQty};
   }).sort((a,b)=>b.recommended-a.recommended);
 
   el.innerHTML=`<div style="overflow-x:auto">
-  <table class="data-table" style="font-size:12px;min-width:500px">
+  <table class="data-table" style="font-size:12px;min-width:560px">
     <thead><tr>
       <th>สินค้า</th>
       <th style="text-align:right">สต็อก</th>
-      <th style="text-align:right">ขาย/เดือน</th>
+      <th style="text-align:right">ขายจริง/เดือน</th>
+      <th style="text-align:right">คาดใช้/เดือน</th>
       <th style="text-align:right">Forecast</th>
       <th style="text-align:right">ควรสั่ง</th>
       <th style="text-align:right">จะสั่ง</th>
@@ -3051,6 +3054,7 @@ function renderForecast(){
       <td style="font-weight:${r.recommended>0?'600':'400'};white-space:nowrap">${esc(r.name)}</td>
       <td style="text-align:right;color:${r.currentStock<=0?'var(--err)':'var(--ink)'}">${r.currentStock}</td>
       <td style="text-align:right">${r.avgMonthly}</td>
+      <td style="text-align:right">${r.monthlyDemand}</td>
       <td style="text-align:right">${r.forecastDemand}</td>
       <td style="text-align:right;font-weight:700;color:${r.recommended>0?'var(--err)':'var(--ok)'}">${r.recommended>0?r.recommended:'✓'}</td>
       <td style="text-align:right">
@@ -3061,7 +3065,7 @@ function renderForecast(){
     </tr>`).join('')}</tbody>
   </table></div>
   <div style="font-size:11px;color:var(--ink3);margin-top:10px">
-    คำนวณจากยอดขายย้อนหลัง ${monthsBack} เดือน · Forecast ${periods} เดือนข้างหน้า
+    Forecast = คาดใช้/เดือน (ตั้งค่าที่หน้าสต็อก "แจ้งเตือนเมื่อเหลือ ≤") × ${periods} เดือน · ขายจริง/เดือน คำนวณจากยอดขายย้อนหลัง ${monthsBack} เดือน (แสดงไว้เทียบเท่านั้น)
   </div>`;
 }
 
@@ -3086,16 +3090,17 @@ function exportForecastCSV(){
   }
   const alphaItems=invData.filter(i=>i.name_normalized.includes('alphabet'))
     .sort((a,b)=>a.name_normalized.localeCompare(b.name_normalized));
-  const rows=[['สินค้า','สต็อกปัจจุบัน','ขายเฉลี่ย/เดือน',`ระยะ Forecast (เดือน)`,`Forecast Demand`,'ควรสั่ง','จะสั่ง']];
+  const rows=[['สินค้า','สต็อกปัจจุบัน','ขายจริง/เดือน','คาดใช้/เดือน',`ระยะ Forecast (เดือน)`,`Forecast Demand`,'ควรสั่ง','จะสั่ง']];
   alphaItems.map(item=>{
     const sm=salesMap[item.name_normalized];
     const mqtys=sm?Object.values(sm.months):[];
     const avg=mqtys.length?parseFloat((mqtys.reduce((s,v)=>s+v,0)/monthsBack).toFixed(1)):0;
-    const fd=Math.ceil(avg*periods),rec=Math.max(fd-item.main_stock,0);
+    const monthlyDemand=item.alert_level||0;
+    const fd=Math.ceil(monthlyDemand*periods),rec=Math.max(fd-item.main_stock,0);
     const orderQty=manualOrderQty[item.name_normalized]!==undefined?manualOrderQty[item.name_normalized]:rec;
-    return{name:item.name,stock:item.main_stock,avg,periods,fd,rec,orderQty,recommended:rec};
+    return{name:item.name,stock:item.main_stock,avg,monthlyDemand,periods,fd,rec,orderQty,recommended:rec};
   }).sort((a,b)=>b.recommended-a.recommended)
-    .forEach(r=>rows.push([r.name,r.stock,r.avg,r.periods,r.fd,r.rec,r.orderQty]));
+    .forEach(r=>rows.push([r.name,r.stock,r.avg,r.monthlyDemand,r.periods,r.fd,r.rec,r.orderQty]));
   if(rows.length<=1){showToast('ไม่มีข้อมูล Alphabet');return;}
   const csv='\uFEFF'+rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
   const a=document.createElement('a');
