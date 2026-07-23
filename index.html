@@ -544,6 +544,7 @@ select:disabled{opacity:.35;cursor:not-allowed}
           <button class="btn-green" onclick="loadInvFromSB().then(()=>{checkLowStock();renderStock();})">↻</button>
         </div>
       </div>
+      <div id="stock-value-summary" style="margin-bottom:.75rem"></div>
       <!-- stock sub-tabs: Main / Defect -->
       <div style="display:flex;border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;margin-bottom:1rem">
         <button id="sv-main-btn" onclick="switchStockView('main')" style="flex:1;padding:8px;font-size:12px;font-weight:700;border:none;background:var(--primary);color:#fff;cursor:pointer;font-family:inherit">Main Stock</button>
@@ -572,7 +573,6 @@ select:disabled{opacity:.35;cursor:not-allowed}
         </select>
         <button class="btn-sm" onclick="exportForecastCSV()">⬇ CSV</button>
       </div>
-      <div id="forecast-sales-summary" style="margin-bottom:1rem"></div>
       <div id="forecast-table"><div class="no-data">กำลังคำนวณ...</div></div>
     </div>
   </div>
@@ -601,7 +601,7 @@ select:disabled{opacity:.35;cursor:not-allowed}
     </div>
     <div class="section">
       <div class="sec-title">นำเข้าจาก CSV / Excel</div>
-      <p style="font-size:12px;color:var(--ink3);margin-bottom:.75rem">คอลัมน์: รายการสินค้า, จำนวน (รองรับ .xlsx และ .csv)</p>
+      <p style="font-size:12px;color:var(--ink3);margin-bottom:.75rem">คอลัมน์: รายการสินค้า, จำนวน, ราคาทุน/หน่วย (ไม่บังคับ)<br>ถ้าจำนวนในไฟล์มากกว่าที่มีในระบบ = รับของเข้าใหม่ → ระบบถัวเฉลี่ยทุนให้อัตโนมัติ<br>ถ้าจำนวนเท่าเดิม/น้อยลง = ปรับยอด → ทุนที่กรอกจะเขียนทับตรงๆ (รองรับ .xlsx และ .csv)</p>
       <div class="upload-box" onclick="document.getElementById('inv-file').click()">
         📂 อัปโหลดไฟล์ inventory (.xlsx หรือ .csv)
         <input type="file" id="inv-file" accept=".xlsx,.csv" onchange="importInvFile(this)">
@@ -1446,7 +1446,9 @@ function saveEntry(){
     const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
     if(dayTotals[key]) best7=Math.max(best7,dayTotals[key]);
   }
-  ents.push({id,date,model,color,channel:selCh,price:selPr,basePrice:bp,qty:selQty,discPerUnit:bp-selPr,extraDisc:ed,totalDisc:td,net,order,custName,stockSrc:selStockSource,note,address});
+  const invItem=invData.find(i=>normMatch(i.name,`${model} ${color}`));
+  const costPrice=invItem?.cost_price||0;
+  ents.push({id,date,model,color,channel:selCh,price:selPr,basePrice:bp,qty:selQty,discPerUnit:bp-selPr,extraDisc:ed,totalDisc:td,net,order,custName,stockSrc:selStockSource,note,address,costPrice});
   saveEnt(ents);
   const del=loadDel();del[id]={status:'prep',scheduledDate:''};saveDel(del);
   // ตัดสต็อกสินค้าหลัก
@@ -2051,12 +2053,20 @@ function renderDashboard(){
   const revenue=ents.reduce((s,e)=>s+e.net,0);
   const expense=bills.reduce((s,b)=>s+b.grand,0);
   const profit=revenue-expense;
+  const cogs=ents.reduce((s,e)=>s+(e.costPrice||0)*(e.qty||1),0);
+  const grossProfit=revenue-cogs;
+  const entsWithCost=ents.filter(e=>e.costPrice>0).length;
   const el=document.getElementById('dash-content');
   el.innerHTML=`<div class="stat-grid">
     <div class="stat-card"><div class="stat-lbl">รายรับ</div><div class="stat-val green">฿${revenue.toLocaleString()}</div></div>
     <div class="stat-card"><div class="stat-lbl">รายจ่าย</div><div class="stat-val red">฿${expense.toLocaleString()}</div></div>
     <div class="stat-card"><div class="stat-lbl">กำไรสุทธิ</div><div class="stat-val ${profit>=0?'green':'red'}">฿${profit.toLocaleString()}</div></div>
   </div>
+  <div class="stat-grid g2" style="margin-top:8px">
+    <div class="stat-card"><div class="stat-lbl">ต้นทุนขาย (COGS)</div><div class="stat-val red">฿${cogs.toLocaleString()}</div></div>
+    <div class="stat-card"><div class="stat-lbl">กำไรขั้นต้น</div><div class="stat-val ${grossProfit>=0?'green':'red'}">฿${grossProfit.toLocaleString()}</div></div>
+  </div>
+  ${ents.length&&entsWithCost<ents.length?`<div style="font-size:11px;color:var(--warn);margin:4px 0 0">⚠ ${ents.length-entsWithCost}/${ents.length} รายการขายยังไม่มีราคาทุนตอนขาย (ตั้งราคาทุนในสต็อกก่อนขายเพื่อให้ตัวเลขนี้แม่นยำ)</div>`:''}
   <div class="chart-bar-wrap" style="margin-top:.5rem">
     <div class="chart-label"><span>รายรับ</span><span>${fmtB(revenue)}</span></div>
     <div class="chart-bar-bg"><div class="chart-bar-fill green" style="width:100%"></div></div>
@@ -2213,7 +2223,7 @@ async function addColor(model){
   const norm=normName(productName);
   const exists=invData.find(i=>i.name_normalized===norm);
   // show initial stock modal
-  showInitStockModal(productName,norm,async(mainStock,defectStock)=>{
+  showInitStockModal(productName,norm,async(mainStock,defectStock,costPrice)=>{
     const cat=loadCat();
     if(!cat[model].colors.includes(c)){
       cat[model].colors.push(c);
@@ -2224,10 +2234,10 @@ async function addColor(model){
     document.getElementById('body-'+model).classList.add('open');
     if(!exists){
       try{
-        await insertInvToSB({name:productName,name_normalized:norm,main_stock:mainStock,defect_stock:defectStock,alert_level:20});
+        await insertInvToSB({name:productName,name_normalized:norm,main_stock:mainStock,defect_stock:defectStock,alert_level:20,cost_price:costPrice});
         if(mainStock>0||defectStock>0) await logInvTx(productName,'INIT',0,mainStock,0,defectStock,mainStock+defectStock,'settings','');
         await loadInvFromSB();
-        showToast(`เพิ่ม ${c} + สต็อก Main:${mainStock} Defect:${defectStock} ✓`);
+        showToast(`เพิ่ม ${c} + สต็อก Main:${mainStock} Defect:${defectStock} ทุน:฿${costPrice} ✓`);
       }catch(e){
         // rollback catalog
         console.error('addColor failed:',e);
@@ -2258,6 +2268,9 @@ function showInitStockModal(productName,norm,onConfirm){
       <div class="field"><label>Defect Stock (ถ้ามี)</label>
         <input type="number" id="init-defect" value="0" min="0" style="font-size:18px;text-align:center;padding:10px;border:1px solid var(--bd);border-radius:var(--r);font-family:inherit;outline:none;width:100%">
       </div>
+      <div class="field"><label>ราคาทุน/หน่วย (บาท)</label>
+        <input type="number" id="init-cost" value="0" min="0" style="font-size:18px;text-align:center;padding:10px;border:1px solid var(--bd);border-radius:var(--r);font-family:inherit;outline:none;width:100%">
+      </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <button onclick="document.getElementById('init-stock-modal').remove()" style="padding:11px;border:1px solid var(--bd);border-radius:var(--r);background:none;font-size:13px;cursor:pointer;font-family:inherit;color:var(--ink2)">ยกเลิก</button>
@@ -2275,9 +2288,10 @@ function confirmInitStock(){
   const modal=document.getElementById('init-stock-modal');if(!modal)return;
   const mainStock=parseInt(document.getElementById('init-main')?.value)||0;
   const defectStock=parseInt(document.getElementById('init-defect')?.value)||0;
+  const costPrice=parseFloat(document.getElementById('init-cost')?.value)||0;
   const cb=modal._onConfirm;
   modal.remove();
-  if(cb) cb(mainStock,defectStock);
+  if(cb) cb(mainStock,defectStock,costPrice);
 }
 function deleteColor(model,c){
   const productName=`${model}-${c}`;
@@ -2548,7 +2562,8 @@ async function insertInvToSB(item){
       name_normalized:normName(item.name),
       main_stock:item.main_stock||0,
       defect_stock:item.defect_stock||0,
-      alert_level:item.alert_level||20
+      alert_level:item.alert_level||20,
+      cost_price:item.cost_price||0
     })
   });
   return res;
@@ -2561,7 +2576,8 @@ async function updateInvToSB(item){
     body:JSON.stringify({
       main_stock:item.main_stock,
       defect_stock:item.defect_stock,
-      alert_level:item.alert_level
+      alert_level:item.alert_level,
+      cost_price:item.cost_price||0
     })
   });
 }
@@ -2683,7 +2699,21 @@ function filterInv(f){
   renderStock();
 }
 
+function renderStockValueSummary(){
+  const el=document.getElementById('stock-value-summary');if(!el)return;
+  const totalValue=invData.reduce((s,i)=>s+(i.main_stock+i.defect_stock)*(i.cost_price||0),0);
+  const mainValue=invData.reduce((s,i)=>s+i.main_stock*(i.cost_price||0),0);
+  const defectValue=invData.reduce((s,i)=>s+i.defect_stock*(i.cost_price||0),0);
+  const missingCost=invData.filter(i=>!(i.cost_price>0)&&(i.main_stock>0||i.defect_stock>0)).length;
+  el.innerHTML=`<div class="stat-grid g2">
+    <div class="stat-card"><div class="stat-lbl">มูลค่าสต็อกรวม</div><div class="stat-val">฿${totalValue.toLocaleString()}</div></div>
+    <div class="stat-card"><div class="stat-lbl">Main / Defect</div><div class="stat-val" style="font-size:14px">฿${mainValue.toLocaleString()} / ฿${defectValue.toLocaleString()}</div></div>
+  </div>
+  ${missingCost?`<div style="font-size:11px;color:var(--warn);margin-top:4px">⚠ มี ${missingCost} รายการที่มีสต็อกแต่ยังไม่ได้ตั้งราคาทุน (กด "฿ ทุน" ที่การ์ดสินค้าเพื่อกรอก)</div>`:''}`;
+}
+
 function renderStock(){
+  renderStockValueSummary();
   const search=(document.getElementById('inv-search')?.value||'').toLowerCase();
   let data=[...invData].sort((a,b)=>a.name_normalized.localeCompare(b.name_normalized));
   if(search) data=data.filter(i=>i.name_normalized.includes(search));
@@ -2698,10 +2728,15 @@ function renderStock(){
     const isZero=qty===0;
     const borderColor=isZero?'#E8A09A':isLow?'#E8C97A':'var(--bd)';
     const bg=isZero?'#FFF8F8':isLow?'#FFFDF5':'var(--sf)';
+    const cost=i.cost_price||0;
+    const itemValue=(i.main_stock+i.defect_stock)*cost;
     return`<div style="border:1px solid ${borderColor};border-radius:var(--r);padding:12px;margin-bottom:6px;background:${bg}">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <span style="font-size:14px;font-weight:600;color:var(--ink)">${esc(i.name)}</span>
         <span style="font-size:22px;font-weight:500;color:${isZero?'var(--err)':isLow?'var(--warn)':'var(--matcha)'}">${qty}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px">
+        <span style="font-size:11px;color:var(--ink3)">ทุน/หน่วย: ${cost>0?'฿'+cost.toLocaleString():'—ยังไม่ตั้งราคาทุน'} ${cost>0?`· มูลค่ารวม ฿${itemValue.toLocaleString()}`:''}</span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
         <span style="font-size:11px;color:var(--ink3)">${stockView==='main'?'Main Stock':'Defect Stock'} ${isLow?'⚠ ใกล้หมด':isZero?'⛔ หมดแล้ว':''}</span>
@@ -2709,11 +2744,20 @@ function renderStock(){
           <button class="btn-sm" onclick="quickAdjust(${i.id},-1,'${stockView}')">−</button>
           <button class="btn-sm" onclick="quickAdjust(${i.id},1,'${stockView}')">+</button>
           ${stockView==='main'
-            ?`<button class="btn-outline" onclick="openMoveModal(${i.id},'defect')">→ Defect</button>`
+            ?`<button class="btn-outline" onclick="openReceiveModal(${i.id})">📦 รับของเข้า</button><button class="btn-outline" onclick="openMoveModal(${i.id},'defect')">→ Defect</button>`
             :`<button class="btn-outline" onclick="openMoveModal(${i.id},'main')">→ Main</button>`
           }
+          <button class="btn-outline" onclick="toggleCost(${i.id})">฿ ทุน</button>
           <button class="btn-outline" onclick="toggleAlert(${i.id})">🔔</button>
           <button class="btn-danger-sm" onclick="deleteInvProduct(${i.id})">ลบ</button>
+        </div>
+      </div>
+      <!-- Cost panel (hidden by default) -->
+      <div id="cost-panel-${i.id}" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--bd2)">
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-size:12px;color:var(--ink2)">ราคาทุน/หน่วย (บาท)</span>
+          <input type="number" id="cost-${i.id}" value="${cost}" min="0" step="0.01" style="width:80px;padding:5px 8px;border:1px solid var(--bd);border-radius:var(--r);font-size:13px;font-family:inherit;outline:none;text-align:center">
+          <button class="btn-add" onclick="saveCostPrice(${i.id})">บันทึก</button>
         </div>
       </div>
       <!-- Alert panel (hidden by default) -->
@@ -2726,6 +2770,96 @@ function renderStock(){
       </div>
     </div>`;
   }).join('');
+}
+
+function toggleCost(id){
+  const panel=document.getElementById(`cost-panel-${id}`);if(!panel)return;
+  panel.style.display=panel.style.display==='none'?'block':'none';
+}
+
+async function saveCostPrice(id){
+  const item=invData.find(i=>i.id===id);if(!item)return;
+  const val=parseFloat(document.getElementById(`cost-${id}`)?.value);
+  if(isNaN(val)||val<0)return;
+  item.cost_price=val;
+  await saveInvToSB(item);
+  renderStock();showToast('บันทึกราคาทุนแล้ว ✓');
+}
+
+// ── รับของเข้า (Main Stock) พร้อมถัวเฉลี่ยทุนแบบเคลื่อนที่ (weighted average) ──
+function openReceiveModal(id){
+  const item=invData.find(i=>i.id===id);if(!item)return;
+  const ex=document.getElementById('receive-modal');if(ex)ex.remove();
+  const modal=document.createElement('div');
+  modal.id='receive-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:600;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.innerHTML=`<div style="background:#fff;border-radius:var(--r);padding:1.5rem;width:100%;max-width:320px;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+    <div style="font-size:15px;font-weight:700;color:var(--ink);margin-bottom:4px">รับของเข้า (Main Stock)</div>
+    <div style="font-size:12px;color:var(--ink3);margin-bottom:1.25rem;padding:6px 10px;background:var(--sf2);border-radius:var(--r)">${esc(item.name)} — ปัจจุบัน ${item.main_stock} ชิ้น @ ฿${(item.cost_price||0).toLocaleString()}/ชิ้น</div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:.75rem">
+      <div class="field"><label>จำนวนที่รับเข้า</label>
+        <input type="number" id="recv-qty" value="1" min="1" oninput="updateReceivePreview(${id})" style="font-size:18px;text-align:center;padding:10px;border:1px solid var(--bd);border-radius:var(--r);font-family:inherit;outline:none;width:100%">
+      </div>
+      <div class="field"><label>ทุน/หน่วยรอบนี้ (บาท)</label>
+        <input type="number" id="recv-cost" value="${item.cost_price||0}" min="0" step="0.01" oninput="updateReceivePreview(${id})" style="font-size:18px;text-align:center;padding:10px;border:1px solid var(--bd);border-radius:var(--r);font-family:inherit;outline:none;width:100%">
+      </div>
+    </div>
+    <div id="recv-preview" style="font-size:12px;color:var(--ink2);background:var(--sf2);padding:8px 10px;border-radius:var(--r);margin-bottom:1.25rem"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button onclick="document.getElementById('receive-modal').remove()" style="padding:11px;border:1px solid var(--bd);border-radius:var(--r);background:none;font-size:13px;cursor:pointer;font-family:inherit;color:var(--ink2)">ยกเลิก</button>
+      <button onclick="confirmReceiveStock(${id})" style="padding:11px;border:none;border-radius:var(--r);background:var(--primary);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">รับเข้า</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.onclick=e=>{if(e.target===modal)modal.remove();};
+  updateReceivePreview(id);
+  setTimeout(()=>document.getElementById('recv-qty')?.focus(),100);
+}
+
+function updateReceivePreview(id){
+  const item=invData.find(i=>i.id===id);if(!item)return;
+  const el=document.getElementById('recv-preview');if(!el)return;
+  const qty=parseInt(document.getElementById('recv-qty')?.value)||0;
+  const cost=parseFloat(document.getElementById('recv-cost')?.value)||0;
+  const newMain=item.main_stock+qty;
+  const avg=newMain>0?((item.main_stock*(item.cost_price||0))+(qty*cost))/newMain:0;
+  el.innerHTML=`สต็อกใหม่: <b>${newMain}</b> ชิ้น &nbsp;·&nbsp; ทุนเฉลี่ยใหม่: <b>฿${avg.toLocaleString(undefined,{maximumFractionDigits:2})}</b>/ชิ้น`;
+}
+
+async function confirmReceiveStock(id){
+  const item=invData.find(i=>i.id===id);if(!item)return;
+  const qty=parseInt(document.getElementById('recv-qty')?.value)||0;
+  const cost=parseFloat(document.getElementById('recv-cost')?.value)||0;
+  if(qty<=0){showToast('กรอกจำนวนที่รับเข้า');return;}
+  const mainB=item.main_stock,defB=item.defect_stock;
+  const oldValue=item.main_stock*(item.cost_price||0);
+  const newMain=item.main_stock+qty;
+  const avgCost=newMain>0?(oldValue+qty*cost)/newMain:cost;
+  item.main_stock=newMain;
+  item.cost_price=Math.round(avgCost*100)/100;
+  await saveInvToSB(item);
+  await logInvTx(item.name,'RECEIVE',mainB,item.main_stock,defB,item.defect_stock,qty,'receive','');
+  // สร้างบิลค่าใช้จ่ายอัตโนมัติ ให้ไปรวมใน "รายจ่าย" ของ Dashboard ทันที ไม่ต้องกรอกซ้ำในแท็บค่าใช้จ่าย
+  let billMsg='';
+  if(cost>0){
+    const billTotal=Math.round(qty*cost*100)/100;
+    const bills=loadBills();
+    bills.unshift({
+      id:Date.now()+1, // +1 กันชนกับ id ของ inventory_log ที่ยิงเกือบพร้อมกัน
+      date:today,
+      vendor:'รับสต็อกสินค้า (อัตโนมัติจากสต็อก)',
+      items:[{name:item.name,qty,price:cost}],
+      vatMode:'none',
+      subtotal:billTotal,vat:0,grand:billTotal,
+      receiptImg:null,forecast:null
+    });
+    await saveBills(bills);
+    genMonthOptions('bills-month');genMonthOptions('report-month');genMonthOptions('dash-month');
+    billMsg=` · บันทึกค่าใช้จ่าย ฿${billTotal.toLocaleString()} ในแท็บค่าใช้จ่ายแล้ว`;
+  }
+  document.getElementById('receive-modal')?.remove();
+  checkLowStock();renderStock();
+  showToast(`รับของเข้า ${qty} ชิ้น · ทุนเฉลี่ยใหม่ ฿${item.cost_price.toLocaleString()}${billMsg} ✓`);
 }
 
 function quickAdjust(id,delta,src){
@@ -2855,12 +2989,7 @@ async function saveAlertLevel(id){
   const val=parseInt(document.getElementById(`alert-${id}`)?.value);
   if(isNaN(val)||val<0)return;
   item.alert_level=val;
-  await saveInvToSB(item);
-  // แก้มือ = ตั้งมาตรฐานใหม่ที่ 100 ใบ/เดือน ด้วย กันปุ่มอัพเดตอัตโนมัติทับค่าที่เพิ่งตั้งเอง
-  const base100=getBase100Map();
-  base100[item.name_normalized]=val;
-  setBase100Map(base100);
-  checkLowStock();renderStock();showToast('บันทึก Alert แล้ว ✓');
+  await saveInvToSB(item);checkLowStock();renderStock();showToast('บันทึก Alert แล้ว ✓');
 }
 
 async function addInvProduct(){
@@ -2904,7 +3033,7 @@ async function importInvFile(input){
     }
     for(let i=startRow;i<lines.length;i++){
       const cols=lines[i].split(',').map(c=>c.replace(/^"|"$/g,'').trim());
-      if(cols[0]) rows.push({name:cols[0],qty:parseInt(cols[1])||0});
+      if(cols[0]) rows.push({name:cols[0],qty:parseInt(cols[1])||0,cost:cols[2]!==undefined&&cols[2]!==''?parseFloat(cols[2]):null});
     }
     await processInvRows(rows);
   } else if(ext==='xlsx'){
@@ -2916,10 +3045,14 @@ async function importInvFile(input){
     const wb=XLSX.read(buf,{type:'array'});
     const ws=wb.Sheets[wb.SheetNames[0]];
     const raw=XLSX.utils.sheet_to_json(ws,{defval:0});
-    const rows=raw.map(r=>({
-      name:String(r['รายการสินค้า']||r['name']||'').trim(),
-      qty:parseInt(r['จำนวน']||r['main_stock']||0)
-    }));
+    const rows=raw.map(r=>{
+      const rawCost=r['ราคาทุน/หน่วย']??r['ราคาทุน']??r['cost']??r['cost_price'];
+      return{
+        name:String(r['รายการสินค้า']||r['name']||'').trim(),
+        qty:parseInt(r['จำนวน']||r['main_stock']||0),
+        cost:(rawCost!==undefined&&rawCost!=='')?parseFloat(rawCost):null
+      };
+    });
     await processInvRows(rows);
   } else {
     showToast('รองรับเฉพาะ .csv และ .xlsx');
@@ -2938,6 +3071,17 @@ async function processInvRows(rows){
     const existing=invData.find(i=>i.name_normalized===norm||normName(i.name)===norm);
     if(existing){
       const mainB=existing.main_stock;
+      const delta=row.qty-existing.main_stock;
+      if(row.cost!=null&&!isNaN(row.cost)){
+        if(delta>0&&row.qty>0){
+          // จำนวนเพิ่มขึ้น = รับของเข้าใหม่ → ถัวเฉลี่ยทุนแบบเคลื่อนที่
+          const oldValue=existing.main_stock*(existing.cost_price||0);
+          existing.cost_price=Math.round(((oldValue+delta*row.cost)/row.qty)*100)/100;
+        } else {
+          // จำนวนเท่าเดิม/ลดลง = แก้ไข/ปรับยอดนับ ไม่ใช่รับของใหม่ → เขียนทับทุนตรงๆ
+          existing.cost_price=row.cost;
+        }
+      }
       existing.main_stock=row.qty;
       // always UPDATE by id — never INSERT
       await updateInvToSB(existing);
@@ -2945,7 +3089,7 @@ async function processInvRows(rows){
       updated++;
     } else {
       // INSERT only when truly no match
-      const newItem={name:row.name,name_normalized:norm,main_stock:row.qty,defect_stock:0,alert_level:20};
+      const newItem={name:row.name,name_normalized:norm,main_stock:row.qty,defect_stock:0,alert_level:20,cost_price:(row.cost!=null&&!isNaN(row.cost))?row.cost:0};
       try{
         await insertInvToSB(newItem);
         if(row.qty>0) await logInvTx(row.name,'INIT',0,row.qty,0,0,row.qty,'import','');
@@ -3001,97 +3145,12 @@ async function importDefaultInventory(){
 // store manual order qty edits (session only, not persisted)
 let manualOrderQty={};
 
-// ── Forecast base-100 scaling ──
-// สมมติฐาน: ตัวเลข "คาดใช้/เดือน" (alert_level) ทุกตัวถูกตั้งไว้บนมาตรฐานยอดขาย 100 ใบ/เดือน
-// ถ้ายอดขายจริงเกิน 100 ใบ/เดือน จะปรับ "คาดใช้/เดือน" ขึ้นตามสัดส่วน แต่ไม่มีการปรับลงต่ำกว่ามาตรฐาน
-const FORECAST_BASE_STANDARD=100;
-
-// base100 เก็บใน localStorage (ต่อเบราว์เซอร์/เครื่อง) — ยังไม่มีคอลัมน์ใน Supabase
-// ถ้าอยากให้ sync ข้ามเครื่องได้ ต้องรัน SQL นี้ใน Supabase SQL editor ก่อน แล้วค่อยย้าย logic มาอ่าน/เขียนคอลัมน์จริง:
-//   ALTER TABLE inventory ADD COLUMN base100 integer;
-function getBase100Map(){
-  try{return JSON.parse(localStorage.getItem('fc_base100')||'{}');}catch(e){return{};}
-}
-function setBase100Map(m){localStorage.setItem('fc_base100',JSON.stringify(m));}
-
-function exportBase100Config(){
-  const data=JSON.stringify(getBase100Map(),null,2);
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));
-  a.download='forecast_base100_backup.json';a.click();
-  showToast('สำรองค่ามาตรฐานแล้ว ✓');
-}
-function importBase100Config(input){
-  const file=input.files[0];if(!file)return;
-  const reader=new FileReader();
-  reader.onload=e=>{
-    try{
-      const data=JSON.parse(e.target.result);
-      setBase100Map(data);
-      showToast('นำเข้าค่ามาตรฐานแล้ว ✓');
-      renderForecast();
-    }catch(err){showToast('ไฟล์ไม่ถูกต้อง');}
-  };
-  reader.readAsText(file);
-  input.value='';
-}
-
-// นับเฉพาะ order ที่มีชื่อลูกค้า (custName) เพราะมีแต่ order แบบนี้เท่านั้นที่ใช้ลูกปัดตัวอักษร
-function getRealMonthlyQty(monthKey){
-  const ents=loadEnt();
-  return ents.filter(e=>e.date.startsWith(monthKey)&&e.custName).reduce((s,e)=>s+(e.qty||1),0);
-}
-
-// ประมาณยอดขายทั้งเดือนจาก pace ของยอดสะสมถึงวันนี้ (ตรงกว่าการดูยอดสะสมดิบๆ ตอนต้นเดือน)
-function getProjectedMonthlyQty(monthKey,now){
-  const mtd=getRealMonthlyQty(monthKey);
-  const [y,m]=monthKey.split('-').map(Number);
-  const daysInMonth=new Date(y,m,0).getDate();
-  const isCurrentMonth=now.getFullYear()===y&&(now.getMonth()+1)===m;
-  const dayOfMonth=isCurrentMonth?now.getDate():daysInMonth;
-  const projected=dayOfMonth>0?Math.round(mtd/dayOfMonth*daysInMonth):mtd;
-  return{mtd,projected,dayOfMonth,daysInMonth};
-}
-
-async function updateForecastFromSales(){
-  const now=new Date();
-  const nowKey=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
-  const{mtd,projected}=getProjectedMonthlyQty(nowKey,now);
-  if(projected<=FORECAST_BASE_STANDARD){
-    showToast(`คาดยอดขายเดือนนี้ (${projected} ใบ) ยังไม่ถึงมาตรฐาน ${FORECAST_BASE_STANDARD} ใบ — ไม่ปรับ Forecast`);
-    return;
-  }
-  const alphaItems=invData.filter(i=>i.name_normalized.includes('alphabet'));
-  if(!alphaItems.length){showToast('ไม่มีสินค้า Alphabet');return;}
-  const scale=projected/FORECAST_BASE_STANDARD;
-  const pct=Math.round((scale-1)*100);
-  if(!confirm(`ยอดขายสะสมเดือนนี้ ${mtd} ใบ · คาดทั้งเดือน ${projected} ใบ (มาตรฐาน ${FORECAST_BASE_STANDARD})\nจะปรับ "คาดใช้/เดือน" ของสินค้า Alphabet ทั้งหมด ${alphaItems.length} รายการ ขึ้น +${pct}%\n\nยืนยันหรือไม่?`)) return;
-  const base100=getBase100Map();
-  const changes=[];
-  alphaItems.forEach(item=>{
-    const base=base100[item.name_normalized]??(item.alert_level||0);
-    base100[item.name_normalized]=base; // กันไว้เผื่อยังไม่เคยบันทึก
-    const oldLevel=item.alert_level||0;
-    const newLevel=Math.round(base*scale);
-    item.alert_level=newLevel;
-    changes.push({item,oldLevel,newLevel});
-  });
-  setBase100Map(base100);
-  await Promise.all(changes.map(async c=>{
-    await saveInvToSB(c.item);
-    await logInvTx(c.item.name,'FORECAST_ADJUST',c.item.main_stock,c.item.main_stock,c.item.defect_stock,c.item.defect_stock,c.newLevel-c.oldLevel,'forecast-scale',`+${pct}%`);
-  }));
-  showToast(`อัพเดต Forecast แล้ว ✓ (+${pct}%)`);
-  renderForecast();
-}
-
 function renderForecast(){
   const periods=parseInt(document.getElementById('fc-period')?.value)||3;
   const el=document.getElementById('forecast-table');if(!el)return;
   const ents=loadEnt();
   const monthsBack=6;
   const now=new Date();
-  const nowKey=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
 
   // คำนวณ avg monthly sales เฉพาะ alphabet
   const salesMap={};
@@ -3113,28 +3172,6 @@ function renderForecast(){
   const alphaItems=invData.filter(i=>i.name_normalized.includes('alphabet'))
     .sort((a,b)=>a.name_normalized.localeCompare(b.name_normalized));
 
-  // ยอดขายรวมทุก order ที่มีชื่อลูกค้าเดือนนี้ (จำนวน "ใบ") เทียบกับมาตรฐาน 100 ใบ/เดือน
-  // ใช้ pace ของยอดสะสมถึงวันนี้มาประมาณยอดทั้งเดือน แม่นกว่าดูยอดสะสมดิบๆ ตอนต้นเดือน
-  const{mtd,projected,dayOfMonth,daysInMonth}=getProjectedMonthlyQty(nowKey,now);
-  const canUpdate=projected>FORECAST_BASE_STANDARD;
-  const pct=Math.round((Math.max(projected,FORECAST_BASE_STANDARD)/FORECAST_BASE_STANDARD-1)*100);
-  const sumEl=document.getElementById('forecast-sales-summary');
-  if(sumEl){
-    sumEl.innerHTML=`<div style="border:1px solid var(--bd);border-radius:var(--r);padding:10px 12px;background:var(--sf2);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-      <div style="font-size:12px;color:var(--ink2)">
-        ยอดสะสมเดือนนี้ (วันที่ ${dayOfMonth}/${daysInMonth}): <b style="color:var(--ink)">${mtd}</b> ใบ · คาดทั้งเดือน: <b style="color:var(--ink)">${projected}</b> ใบ · มาตรฐานฐาน: <b>${FORECAST_BASE_STANDARD}</b> ใบ/เดือน
-        ${canUpdate?`<span style="color:var(--err);font-weight:600"> (+${pct}%)</span>`:`<span style="color:var(--ink3)"> — ยังไม่ถึงมาตรฐาน ไม่ต้องปรับ</span>`}
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn-sm" ${canUpdate?'':'disabled style="opacity:.4;cursor:not-allowed"'} onclick="updateForecastFromSales()">🔄 อัพเดต Forecast${canUpdate?` +${pct}%`:''}</button>
-        <button class="btn-sm" onclick="exportBase100Config()" title="สำรองค่ามาตรฐาน 100 เป็นไฟล์ (ย้ายไปเปิดเครื่องอื่นได้)">💾 Backup</button>
-        <label class="btn-sm" style="cursor:pointer;display:inline-flex;align-items:center" title="นำเข้าค่ามาตรฐานจากไฟล์ backup">📂 Restore
-          <input type="file" accept="application/json" style="display:none" onchange="importBase100Config(this)">
-        </label>
-      </div>
-    </div>`;
-  }
-
   if(!alphaItems.length){el.innerHTML='<div class="no-data">ไม่มีสินค้า Alphabet ในสต็อก</div>';return;}
 
   const rows=alphaItems.map(item=>{
@@ -3142,34 +3179,28 @@ function renderForecast(){
     const monthlyQtys=sm?Object.values(sm.months):[];
     const avgMonthly=monthlyQtys.length
       ?parseFloat((monthlyQtys.reduce((s,v)=>s+v,0)/monthsBack).toFixed(1)):0;
-    // จำนวนที่คาดว่าจะใช้ต่อเดือน = เลขที่ตั้งไว้ในช่อง "แจ้งเตือนเมื่อเหลือ ≤" ของหน้าสต็อก (ปรับอัตโนมัติได้ด้วยปุ่มด้านบน)
-    const monthlyDemand=item.alert_level||0;
-    const forecastDemand=Math.ceil(monthlyDemand*periods);
+    const forecastDemand=Math.ceil(avgMonthly*periods);
     const currentStock=item.main_stock;
     const recommended=Math.max(forecastDemand-currentStock,0);
     const orderQty=manualOrderQty[item.name_normalized]!==undefined
       ?manualOrderQty[item.name_normalized]:recommended;
-    return{id:item.id,norm:item.name_normalized,name:item.name,avgMonthly,monthlyDemand,forecastDemand,currentStock,recommended,orderQty};
+    return{id:item.id,norm:item.name_normalized,name:item.name,avgMonthly,forecastDemand,currentStock,recommended,orderQty};
   }).sort((a,b)=>b.recommended-a.recommended);
 
-  const stickyCol='position:sticky;left:0;background:var(--sf);box-shadow:2px 0 4px -2px rgba(0,0,0,.2)';
-  const stickyHead='position:sticky;top:0;background:var(--sf);z-index:3';
-  el.innerHTML=`<div style="overflow:auto;max-height:60vh;border:1px solid var(--bd2);border-radius:var(--r)">
-  <table class="data-table" style="font-size:12px;min-width:560px">
+  el.innerHTML=`<div style="overflow-x:auto">
+  <table class="data-table" style="font-size:12px;min-width:500px">
     <thead><tr>
-      <th style="${stickyCol};${stickyHead}">สินค้า</th>
-      <th style="text-align:right;${stickyHead}">สต็อก</th>
-      <th style="text-align:right;${stickyHead}">ใช้จริง/ด. (ตัวอักษร)</th>
-      <th style="text-align:right;${stickyHead}">คาดใช้/เดือน</th>
-      <th style="text-align:right;${stickyHead}">Forecast</th>
-      <th style="text-align:right;${stickyHead}">ควรสั่ง</th>
-      <th style="text-align:right;${stickyHead}">จะสั่ง</th>
+      <th>สินค้า</th>
+      <th style="text-align:right">สต็อก</th>
+      <th style="text-align:right">ขาย/เดือน</th>
+      <th style="text-align:right">Forecast</th>
+      <th style="text-align:right">ควรสั่ง</th>
+      <th style="text-align:right">จะสั่ง</th>
     </tr></thead>
     <tbody>${rows.map(r=>`<tr>
-      <td style="${stickyCol};z-index:1;font-weight:${r.recommended>0?'600':'400'};white-space:nowrap">${esc(r.name)}</td>
+      <td style="font-weight:${r.recommended>0?'600':'400'};white-space:nowrap">${esc(r.name)}</td>
       <td style="text-align:right;color:${r.currentStock<=0?'var(--err)':'var(--ink)'}">${r.currentStock}</td>
       <td style="text-align:right">${r.avgMonthly}</td>
-      <td style="text-align:right">${r.monthlyDemand}</td>
       <td style="text-align:right">${r.forecastDemand}</td>
       <td style="text-align:right;font-weight:700;color:${r.recommended>0?'var(--err)':'var(--ok)'}">${r.recommended>0?r.recommended:'✓'}</td>
       <td style="text-align:right">
@@ -3180,7 +3211,7 @@ function renderForecast(){
     </tr>`).join('')}</tbody>
   </table></div>
   <div style="font-size:11px;color:var(--ink3);margin-top:10px">
-    Forecast = คาดใช้/เดือน × ${periods} เดือน · "ใช้จริง/ด. (ตัวอักษร)" คำนวณจากยอดขายย้อนหลัง ${monthsBack} เดือน (แสดงไว้เทียบเท่านั้น ไม่ใช้คำนวณคำสั่งซื้อ)
+    คำนวณจากยอดขายย้อนหลัง ${monthsBack} เดือน · Forecast ${periods} เดือนข้างหน้า
   </div>`;
 }
 
@@ -3205,25 +3236,16 @@ function exportForecastCSV(){
   }
   const alphaItems=invData.filter(i=>i.name_normalized.includes('alphabet'))
     .sort((a,b)=>a.name_normalized.localeCompare(b.name_normalized));
-  const nowKey=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
-  const{mtd,projected,dayOfMonth,daysInMonth}=getProjectedMonthlyQty(nowKey,now);
-  const rows=[
-    [`ยอดสะสมเดือนนี้ (วันที่ ${dayOfMonth}/${daysInMonth})`,mtd+' ใบ'],
-    ['คาดทั้งเดือน',projected+' ใบ'],
-    ['มาตรฐานฐาน',FORECAST_BASE_STANDARD+' ใบ/เดือน'],
-    [],
-    ['สินค้า','สต็อกปัจจุบัน','ใช้จริง/ด. (ตัวอักษร)','คาดใช้/เดือน',`ระยะ Forecast (เดือน)`,`Forecast Demand`,'ควรสั่ง','จะสั่ง']
-  ];
+  const rows=[['สินค้า','สต็อกปัจจุบัน','ขายเฉลี่ย/เดือน',`ระยะ Forecast (เดือน)`,`Forecast Demand`,'ควรสั่ง','จะสั่ง']];
   alphaItems.map(item=>{
     const sm=salesMap[item.name_normalized];
     const mqtys=sm?Object.values(sm.months):[];
     const avg=mqtys.length?parseFloat((mqtys.reduce((s,v)=>s+v,0)/monthsBack).toFixed(1)):0;
-    const monthlyDemand=item.alert_level||0;
-    const fd=Math.ceil(monthlyDemand*periods),rec=Math.max(fd-item.main_stock,0);
+    const fd=Math.ceil(avg*periods),rec=Math.max(fd-item.main_stock,0);
     const orderQty=manualOrderQty[item.name_normalized]!==undefined?manualOrderQty[item.name_normalized]:rec;
-    return{name:item.name,stock:item.main_stock,avg,monthlyDemand,periods,fd,rec,orderQty,recommended:rec};
+    return{name:item.name,stock:item.main_stock,avg,periods,fd,rec,orderQty,recommended:rec};
   }).sort((a,b)=>b.recommended-a.recommended)
-    .forEach(r=>rows.push([r.name,r.stock,r.avg,r.monthlyDemand,r.periods,r.fd,r.rec,r.orderQty]));
+    .forEach(r=>rows.push([r.name,r.stock,r.avg,r.periods,r.fd,r.rec,r.orderQty]));
   if(rows.length<=1){showToast('ไม่มีข้อมูล Alphabet');return;}
   const csv='\uFEFF'+rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
   const a=document.createElement('a');
@@ -3249,8 +3271,8 @@ async function renderLog(){
     if(search) logs=logs.filter(l=>l.product_name?.toLowerCase().includes(search));
     const el=document.getElementById('log-list');if(!el)return;
     if(!logs.length){el.innerHTML='<div class="no-data">ไม่มีประวัติ</div>';return;}
-    const typeLabel={SALE:'ขาย',RESTORE:'คืน',ADJUST:'แก้ไข',MOVE_DEFECT:'→Defect',MOVE_MAIN:'→Main',INIT:'เริ่มต้น',IMPORT:'นำเข้า',FORECAST_ADJUST:'ปรับ Forecast'};
-    const typeCls={SALE:'log-sale',RESTORE:'log-restore',ADJUST:'log-adjust',MOVE_DEFECT:'log-move',MOVE_MAIN:'log-move',INIT:'log-adjust',IMPORT:'log-adjust',FORECAST_ADJUST:'log-adjust'};
+    const typeLabel={SALE:'ขาย',RESTORE:'คืน',ADJUST:'แก้ไข',MOVE_DEFECT:'→Defect',MOVE_MAIN:'→Main',INIT:'เริ่มต้น',IMPORT:'นำเข้า'};
+    const typeCls={SALE:'log-sale',RESTORE:'log-restore',ADJUST:'log-adjust',MOVE_DEFECT:'log-move',MOVE_MAIN:'log-move',INIT:'log-adjust',IMPORT:'log-adjust'};
     el.innerHTML=logs.map(l=>`<div class="log-row">
       <div style="display:flex;flex-direction:column;gap:3px;flex:1">
         <span style="font-size:13px;font-weight:600">${esc(l.product_name)}</span>
@@ -3267,9 +3289,11 @@ async function renderLog(){
 
 function exportInvCSV(){
   if(!invData.length){showToast('ไม่มีข้อมูล');return;}
-  const rows=[['ชื่อสินค้า','Main Stock','Defect Stock','Total','Alert Level'],
+  // ลำดับคอลัมน์ตรงกับที่ตัวนำเข้า (importInvFile) อ่าน: col0=ชื่อ, col1=จำนวน(Main), col2=ราคาทุน/หน่วย
+  // → ไฟล์นี้เอาไปแก้แล้วนำเข้ากลับได้เลย (Defect Stock, Alert Level แนบไว้อ่านอย่างเดียว ตัวนำเข้าไม่ใช้)
+  const rows=[['รายการสินค้า','จำนวน','ราคาทุน/หน่วย','Defect Stock','Alert Level'],
     ...[...invData].sort((a,b)=>a.name_normalized.localeCompare(b.name_normalized))
-      .map(i=>[i.name,i.main_stock,i.defect_stock,i.main_stock+i.defect_stock,i.alert_level])];
+      .map(i=>[i.name,i.main_stock,i.cost_price||0,i.defect_stock,i.alert_level])];
   const csv='\uFEFF'+rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
