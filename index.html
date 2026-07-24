@@ -568,7 +568,7 @@ select:disabled{opacity:.35;cursor:not-allowed}
         <button id="fc-basis-actual" onclick="setForecastBasis('actual')" style="flex:1;padding:8px;font-size:12px;font-weight:700;border:none;background:var(--primary);color:#fff;cursor:pointer;font-family:inherit">จากยอดขายจริง</button>
         <button id="fc-basis-default" onclick="setForecastBasis('default100')" style="flex:1;padding:8px;font-size:12px;font-weight:500;border:none;background:var(--sf2);color:var(--ink2);cursor:pointer;font-family:inherit;border-left:1px solid var(--bd)">Default 100 ใบ/เดือน</button>
       </div>
-      <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;align-items:center">
+      <div style="display:flex;gap:8px;margin-bottom:.75rem;flex-wrap:wrap;align-items:center">
         <select id="fc-period" onchange="renderForecast()" style="flex:1">
           <option value="1">1 เดือน</option>
           <option value="2">2 เดือน</option>
@@ -576,6 +576,14 @@ select:disabled{opacity:.35;cursor:not-allowed}
           <option value="4">4 เดือน</option>
         </select>
         <button class="btn-sm" onclick="exportForecastCSV()">⬇ CSV</button>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap;align-items:flex-end">
+        <div class="field" style="flex:1;min-width:100px;margin-bottom:0"><label style="font-size:11px">Lead time ต่ำสุด (วัน)</label>
+          <input type="number" id="fc-lead-min" min="0" value="20" oninput="saveLeadTimeSettings();renderForecast()" style="width:100%;padding:6px 8px;border:1px solid var(--bd);border-radius:var(--r);font-size:12px;font-family:inherit;outline:none">
+        </div>
+        <div class="field" style="flex:1;min-width:100px;margin-bottom:0"><label style="font-size:11px">Lead time สูงสุด (วัน)</label>
+          <input type="number" id="fc-lead-max" min="0" value="25" oninput="saveLeadTimeSettings();renderForecast()" style="width:100%;padding:6px 8px;border:1px solid var(--bd);border-radius:var(--r);font-size:12px;font-family:inherit;outline:none">
+        </div>
       </div>
       <div id="forecast-table"><div class="no-data">กำลังคำนวณ...</div></div>
     </div>
@@ -2683,7 +2691,12 @@ function switchInvTab(t){
   });
   if(t==='istock') renderStock();
   if(t==='ilog'){genLogMonths();renderLog();}
-  if(t==='iforecast') renderForecast();
+  if(t==='iforecast'){
+    const lt=loadLeadTimeSettings();
+    if(document.getElementById('fc-lead-min'))document.getElementById('fc-lead-min').value=lt.min;
+    if(document.getElementById('fc-lead-max'))document.getElementById('fc-lead-max').value=lt.max;
+    renderForecast();
+  }
 }
 
 let stockView='main'; // 'main' or 'defect'
@@ -3161,6 +3174,14 @@ async function importDefaultInventory(){
 let manualOrderQty={};
 let forecastBasis='actual'; // 'actual' = จากยอดขายจริง, 'default100' = สมมติขาย 100 ใบ/เดือน
 
+// ── Lead time / Safety stock ──
+function loadLeadTimeSettings(){return lsGet('fc_leadtime',{min:20,max:25});}
+function saveLeadTimeSettings(){
+  const min=parseFloat(document.getElementById('fc-lead-min')?.value)||0;
+  const max=parseFloat(document.getElementById('fc-lead-max')?.value)||0;
+  lsSet('fc_leadtime',{min,max});
+}
+
 function setForecastBasis(basis){
   forecastBasis=basis;
   document.getElementById('fc-basis-actual').style.background=basis==='actual'?'var(--primary)':'var(--sf2)';
@@ -3210,6 +3231,9 @@ function renderForecast(){
   if(!alphaItems.length){el.innerHTML='<div class="no-data">ไม่มีสินค้า Alphabet ในสต็อก</div>';return;}
 
   const actualAvg=actualLetterAvgMonthly();
+  const lt=loadLeadTimeSettings();
+  const leadAvgDays=(lt.min+lt.max)/2;
+  const safetyDays=Math.max(lt.max-lt.min,0);
 
   const rows=alphaItems.map(item=>{
     let avgMonthly;
@@ -3219,22 +3243,27 @@ function renderForecast(){
     } else {
       avgMonthly=actualAvg[item.name_normalized]||0;
     }
-    const forecastDemand=Math.ceil(avgMonthly*periods);
+    const dailyDemand=avgMonthly/30;
+    const forecastDemand=Math.ceil(avgMonthly*periods); // demand ในช่วง forecast ที่เลือก (ไม่รวม lead time)
+    const leadTimeBuffer=Math.ceil(dailyDemand*leadAvgDays); // เผื่อของระหว่างรอสั่ง (20-25 วัน เฉลี่ย)
+    const safetyStock=Math.ceil(dailyDemand*safetyDays); // เผื่อความไม่แน่นอนของ lead time (25-20=5 วัน)
     const currentStock=item.main_stock;
-    const recommended=Math.max(forecastDemand-currentStock,0);
+    const recommended=Math.max(forecastDemand+leadTimeBuffer+safetyStock-currentStock,0);
     const orderKey=item.name_normalized+'|'+forecastBasis;
     const orderQty=manualOrderQty[orderKey]!==undefined
       ?manualOrderQty[orderKey]:recommended;
-    return{id:item.id,norm:item.name_normalized,orderKey,name:item.name,avgMonthly,forecastDemand,currentStock,recommended,orderQty};
+    return{id:item.id,norm:item.name_normalized,orderKey,name:item.name,avgMonthly,forecastDemand,leadTimeBuffer,safetyStock,currentStock,recommended,orderQty};
   }).sort((a,b)=>b.recommended-a.recommended);
 
   el.innerHTML=`<div style="overflow-x:auto">
-  <table class="data-table" style="font-size:12px;min-width:500px">
+  <table class="data-table" style="font-size:12px;min-width:640px">
     <thead><tr>
       <th>สินค้า</th>
       <th style="text-align:right">สต็อก</th>
       <th style="text-align:right">ขาย/เดือน</th>
       <th style="text-align:right">Forecast</th>
+      <th style="text-align:right">เผื่อ Lead Time</th>
+      <th style="text-align:right">เผื่อ Safety</th>
       <th style="text-align:right">ควรสั่ง</th>
       <th style="text-align:right">จะสั่ง</th>
     </tr></thead>
@@ -3243,6 +3272,8 @@ function renderForecast(){
       <td style="text-align:right;color:${r.currentStock<=0?'var(--err)':'var(--ink)'}">${r.currentStock}</td>
       <td style="text-align:right">${r.avgMonthly}</td>
       <td style="text-align:right">${r.forecastDemand}</td>
+      <td style="text-align:right;color:var(--ink3)">+${r.leadTimeBuffer}</td>
+      <td style="text-align:right;color:var(--ink3)">+${r.safetyStock}</td>
       <td style="text-align:right;font-weight:700;color:${r.recommended>0?'var(--err)':'var(--ok)'}">${r.recommended>0?r.recommended:'✓'}</td>
       <td style="text-align:right">
         <input type="number" min="0" value="${r.orderQty}"
@@ -3253,7 +3284,7 @@ function renderForecast(){
   </table></div>
   <div style="font-size:11px;color:var(--ink3);margin-top:10px">${forecastBasis==='default100'
     ?'ฐานคำนวณ: สมมติขาย 100 ใบ/เดือน (สัดส่วนตัวอักษรจากรายงานขาย เม.ย. 2026)'
-    :'ฐานคำนวณ: ยอดขายจริงย้อนหลัง 6 เดือน'} · Forecast ${periods} เดือนข้างหน้า
+    :'ฐานคำนวณ: ยอดขายจริงย้อนหลัง 6 เดือน'} · Forecast ${periods} เดือนข้างหน้า · Lead time ${lt.min}-${lt.max} วัน (เฉลี่ย ${leadAvgDays} วัน, เผื่อไม่แน่นอน ${safetyDays} วัน)
   </div>`;
 }
 
@@ -3263,7 +3294,10 @@ function exportForecastCSV(){
     .sort((a,b)=>a.name_normalized.localeCompare(b.name_normalized));
   const actualAvg=actualLetterAvgMonthly();
   const basisLabel=forecastBasis==='default100'?'Default 100/month':'Actual sales';
-  const rows=[['Product','Current Stock',`Avg per Month (${basisLabel})`,'Forecast Period (months)','Forecast Demand','Recommended','Will Order']];
+  const lt=loadLeadTimeSettings();
+  const leadAvgDays=(lt.min+lt.max)/2;
+  const safetyDays=Math.max(lt.max-lt.min,0);
+  const rows=[['Product','Current Stock',`Avg per Month (${basisLabel})`,'Forecast Period (months)','Forecast Demand','Lead Time Buffer','Safety Stock','Recommended','Will Order']];
   alphaItems.map(item=>{
     let avg;
     if(forecastBasis==='default100'){
@@ -3272,12 +3306,16 @@ function exportForecastCSV(){
     } else {
       avg=actualAvg[item.name_normalized]||0;
     }
-    const fd=Math.ceil(avg*periods),rec=Math.max(fd-item.main_stock,0);
+    const dailyDemand=avg/30;
+    const fd=Math.ceil(avg*periods);
+    const leadBuf=Math.ceil(dailyDemand*leadAvgDays);
+    const safety=Math.ceil(dailyDemand*safetyDays);
+    const rec=Math.max(fd+leadBuf+safety-item.main_stock,0);
     const orderKey=item.name_normalized+'|'+forecastBasis;
     const orderQty=manualOrderQty[orderKey]!==undefined?manualOrderQty[orderKey]:rec;
-    return{name:item.name,stock:item.main_stock,avg,periods,fd,rec,orderQty,recommended:rec};
+    return{name:item.name,stock:item.main_stock,avg,periods,fd,leadBuf,safety,rec,orderQty,recommended:rec};
   }).sort((a,b)=>b.recommended-a.recommended)
-    .forEach(r=>rows.push([r.name,r.stock,r.avg,r.periods,r.fd,r.rec,r.orderQty]));
+    .forEach(r=>rows.push([r.name,r.stock,r.avg,r.periods,r.fd,r.leadBuf,r.safety,r.rec,r.orderQty]));
   if(rows.length<=1){showToast('No Alphabet data');return;}
   const BOM=String.fromCharCode(65279);
   const csv=BOM+rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
