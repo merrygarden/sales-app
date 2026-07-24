@@ -564,6 +564,10 @@ select:disabled{opacity:.35;cursor:not-allowed}
   <div class="page" id="stab-iforecast">
     <div class="section">
       <div class="sec-title">Forecast การสั่งซื้อ</div>
+      <div style="display:flex;border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;margin-bottom:.75rem">
+        <button id="fc-basis-actual" onclick="setForecastBasis('actual')" style="flex:1;padding:8px;font-size:12px;font-weight:700;border:none;background:var(--primary);color:#fff;cursor:pointer;font-family:inherit">จากยอดขายจริง</button>
+        <button id="fc-basis-default" onclick="setForecastBasis('default100')" style="flex:1;padding:8px;font-size:12px;font-weight:500;border:none;background:var(--sf2);color:var(--ink2);cursor:pointer;font-family:inherit;border-left:1px solid var(--bd)">Default 100 ใบ/เดือน</button>
+      </div>
       <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;align-items:center">
         <select id="fc-period" onchange="renderForecast()" style="flex:1">
           <option value="1">1 เดือน</option>
@@ -1131,6 +1135,17 @@ async function syncFromSupabase(){
 
 const DEFAULT_CAT={
   City:{basePrice:1890,colors:['Black','Red Velvet','Brownie','White Choc'],prices:{'Black':[1890,1626,1400,1100,1000,900],'Red Velvet':[1890,1626,1400,1100,1000],'Brownie':[1890,1626,1400,1100,1000],'White Choc':[1890,1626,1400,1100,1000]}}
+};
+
+// ═══════════════════════════════════════════════
+// FORECAST — baseline สัดส่วนตัวอักษร 18mm-Alphabet
+// อ้างอิงจาก "Meri Hari_SalesByProductReport_01-04-2026_30-04-2026"
+// (ยอดขาย 130 บิล ใช้ตัวอักษรรวม 616 ตัว) แปลงเป็นอัตราต่อ "100 ใบ/เดือน"
+// ═══════════════════════════════════════════════
+const LETTER_RATIO_PER_100BAGS={
+  A:103.08,B:3.85,C:4.62,D:6.15,E:14.62,F:2.31,G:2.31,H:8.46,I:60.77,J:2.31,
+  K:10.00,L:13.08,M:19.23,N:66.92,O:45.38,P:16.15,Q:0,R:9.23,S:12.31,T:41.54,
+  U:13.08,V:3.08,W:6.92,X:2.31,Y:3.85,Z:2.31
 };
 
 // ═══════════════════════════════════════════════
@@ -3144,15 +3159,24 @@ async function importDefaultInventory(){
 
 // store manual order qty edits (session only, not persisted)
 let manualOrderQty={};
+let forecastBasis='actual'; // 'actual' = จากยอดขายจริง, 'default100' = สมมติขาย 100 ใบ/เดือน
 
-function renderForecast(){
-  const periods=parseInt(document.getElementById('fc-period')?.value)||3;
-  const el=document.getElementById('forecast-table');if(!el)return;
+function setForecastBasis(basis){
+  forecastBasis=basis;
+  document.getElementById('fc-basis-actual').style.background=basis==='actual'?'var(--primary)':'var(--sf2)';
+  document.getElementById('fc-basis-actual').style.color=basis==='actual'?'#fff':'var(--ink2)';
+  document.getElementById('fc-basis-actual').style.fontWeight=basis==='actual'?'700':'500';
+  document.getElementById('fc-basis-default').style.background=basis==='default100'?'var(--primary)':'var(--sf2)';
+  document.getElementById('fc-basis-default').style.color=basis==='default100'?'#fff':'var(--ink2)';
+  document.getElementById('fc-basis-default').style.fontWeight=basis==='default100'?'700':'500';
+  renderForecast();
+}
+
+// คำนวณค่าเฉลี่ยขาย/เดือนของแต่ละตัวอักษร จากยอดขายจริงย้อนหลัง 6 เดือน
+function actualLetterAvgMonthly(){
   const ents=loadEnt();
   const monthsBack=6;
   const now=new Date();
-
-  // คำนวณ avg monthly sales เฉพาะ alphabet
   const salesMap={};
   for(let m=0;m<monthsBack;m++){
     const d=new Date(now.getFullYear(),now.getMonth()-m,1);
@@ -3167,6 +3191,17 @@ function renderForecast(){
       });
     });
   }
+  const avgMap={};
+  Object.values(salesMap).forEach(sm=>{
+    const monthlyQtys=Object.values(sm.months);
+    avgMap[sm.norm]=monthlyQtys.length?parseFloat((monthlyQtys.reduce((s,v)=>s+v,0)/monthsBack).toFixed(1)):0;
+  });
+  return avgMap;
+}
+
+function renderForecast(){
+  const periods=parseInt(document.getElementById('fc-period')?.value)||3;
+  const el=document.getElementById('forecast-table');if(!el)return;
 
   // เฉพาะ alphabet ใน invData
   const alphaItems=invData.filter(i=>i.name_normalized.includes('alphabet'))
@@ -3174,17 +3209,23 @@ function renderForecast(){
 
   if(!alphaItems.length){el.innerHTML='<div class="no-data">ไม่มีสินค้า Alphabet ในสต็อก</div>';return;}
 
+  const actualAvg=actualLetterAvgMonthly();
+
   const rows=alphaItems.map(item=>{
-    const sm=salesMap[item.name_normalized];
-    const monthlyQtys=sm?Object.values(sm.months):[];
-    const avgMonthly=monthlyQtys.length
-      ?parseFloat((monthlyQtys.reduce((s,v)=>s+v,0)/monthsBack).toFixed(1)):0;
+    let avgMonthly;
+    if(forecastBasis==='default100'){
+      const letter=(item.name.match(/18mm-([A-Za-z])-alphabet/i)||[])[1];
+      avgMonthly=letter?(LETTER_RATIO_PER_100BAGS[letter.toUpperCase()]||0):0;
+    } else {
+      avgMonthly=actualAvg[item.name_normalized]||0;
+    }
     const forecastDemand=Math.ceil(avgMonthly*periods);
     const currentStock=item.main_stock;
     const recommended=Math.max(forecastDemand-currentStock,0);
-    const orderQty=manualOrderQty[item.name_normalized]!==undefined
-      ?manualOrderQty[item.name_normalized]:recommended;
-    return{id:item.id,norm:item.name_normalized,name:item.name,avgMonthly,forecastDemand,currentStock,recommended,orderQty};
+    const orderKey=item.name_normalized+'|'+forecastBasis;
+    const orderQty=manualOrderQty[orderKey]!==undefined
+      ?manualOrderQty[orderKey]:recommended;
+    return{id:item.id,norm:item.name_normalized,orderKey,name:item.name,avgMonthly,forecastDemand,currentStock,recommended,orderQty};
   }).sort((a,b)=>b.recommended-a.recommended);
 
   el.innerHTML=`<div style="overflow-x:auto">
@@ -3206,52 +3247,45 @@ function renderForecast(){
       <td style="text-align:right">
         <input type="number" min="0" value="${r.orderQty}"
           style="width:60px;padding:3px 6px;border:1px solid var(--bd);border-radius:var(--r);font-size:12px;text-align:right;font-family:inherit"
-          onchange="manualOrderQty['${r.norm}']=parseInt(this.value)||0">
+          onchange="manualOrderQty['${r.orderKey}']=parseInt(this.value)||0">
       </td>
     </tr>`).join('')}</tbody>
   </table></div>
-  <div style="font-size:11px;color:var(--ink3);margin-top:10px">
-    คำนวณจากยอดขายย้อนหลัง ${monthsBack} เดือน · Forecast ${periods} เดือนข้างหน้า
+  <div style="font-size:11px;color:var(--ink3);margin-top:10px">${forecastBasis==='default100'
+    ?'ฐานคำนวณ: สมมติขาย 100 ใบ/เดือน (สัดส่วนตัวอักษรจากรายงานขาย เม.ย. 2026)'
+    :'ฐานคำนวณ: ยอดขายจริงย้อนหลัง 6 เดือน'} · Forecast ${periods} เดือนข้างหน้า
   </div>`;
 }
 
 function exportForecastCSV(){
   const periods=parseInt(document.getElementById('fc-period')?.value)||3;
-  const ents=loadEnt();
-  const monthsBack=6;
-  const now=new Date();
-  const salesMap={};
-  for(let m=0;m<monthsBack;m++){
-    const d=new Date(now.getFullYear(),now.getMonth()-m,1);
-    const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-    ents.filter(e=>e.date.startsWith(key)).forEach(e=>{
-      if(!e.custName)return;
-      e.custName.toUpperCase().split('').forEach(l=>{
-        if(!/[A-Z]/.test(l))return;
-        const norm=normName(`18mm-${l}-alphabet`);
-        if(!salesMap[norm])salesMap[norm]={months:{}};
-        salesMap[norm].months[key]=(salesMap[norm].months[key]||0)+1;
-      });
-    });
-  }
   const alphaItems=invData.filter(i=>i.name_normalized.includes('alphabet'))
     .sort((a,b)=>a.name_normalized.localeCompare(b.name_normalized));
-  const rows=[['สินค้า','สต็อกปัจจุบัน','ขายเฉลี่ย/เดือน',`ระยะ Forecast (เดือน)`,`Forecast Demand`,'ควรสั่ง','จะสั่ง']];
+  const actualAvg=actualLetterAvgMonthly();
+  const basisLabel=forecastBasis==='default100'?'Default 100/month':'Actual sales';
+  const rows=[['Product','Current Stock',`Avg per Month (${basisLabel})`,'Forecast Period (months)','Forecast Demand','Recommended','Will Order']];
   alphaItems.map(item=>{
-    const sm=salesMap[item.name_normalized];
-    const mqtys=sm?Object.values(sm.months):[];
-    const avg=mqtys.length?parseFloat((mqtys.reduce((s,v)=>s+v,0)/monthsBack).toFixed(1)):0;
+    let avg;
+    if(forecastBasis==='default100'){
+      const letter=(item.name.match(/18mm-([A-Za-z])-alphabet/i)||[])[1];
+      avg=letter?(LETTER_RATIO_PER_100BAGS[letter.toUpperCase()]||0):0;
+    } else {
+      avg=actualAvg[item.name_normalized]||0;
+    }
     const fd=Math.ceil(avg*periods),rec=Math.max(fd-item.main_stock,0);
-    const orderQty=manualOrderQty[item.name_normalized]!==undefined?manualOrderQty[item.name_normalized]:rec;
+    const orderKey=item.name_normalized+'|'+forecastBasis;
+    const orderQty=manualOrderQty[orderKey]!==undefined?manualOrderQty[orderKey]:rec;
     return{name:item.name,stock:item.main_stock,avg,periods,fd,rec,orderQty,recommended:rec};
   }).sort((a,b)=>b.recommended-a.recommended)
     .forEach(r=>rows.push([r.name,r.stock,r.avg,r.periods,r.fd,r.rec,r.orderQty]));
-  if(rows.length<=1){showToast('ไม่มีข้อมูล Alphabet');return;}
-  const csv='\uFEFF'+rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  if(rows.length<=1){showToast('No Alphabet data');return;}
+  const BOM=String.fromCharCode(65279);
+  const csv=BOM+rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
-  a.download=`alphabet_forecast_${periods}m.csv`;a.click();showToast('ดาวน์โหลดแล้ว ✓');
+  a.download='alphabet_forecast_'+forecastBasis+'_'+periods+'m.csv';a.click();showToast('ดาวน์โหลดแล้ว ✓');
 }
+
 function genLogMonths(){
   const sel=document.getElementById('log-month');if(!sel)return;
   const TH=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
