@@ -136,6 +136,12 @@ select:disabled{opacity:.35;cursor:not-allowed}
 .data-table th{text-align:left;padding:6px 0;color:var(--ink2);font-weight:700;border-bottom:1px solid var(--bd);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
 .data-table td{padding:8px 0;border-bottom:1px solid var(--bd2);color:var(--ink);font-weight:400}
 .data-table td:last-child,.data-table th:last-child{text-align:right}
+/* Forecast table: ล็อกคอลัมน์แรก (ชื่อสินค้า) ไว้เวลาเลื่อนแนวนอนบนมือถือ */
+.fc-table{border-collapse:separate;border-spacing:0}
+.fc-table th:first-child,.fc-table td:first-child{
+  position:sticky;left:0;background:var(--sf);z-index:2;
+  box-shadow:2px 0 4px -2px rgba(0,0,0,.15);padding-right:8px;
+}
 /* ── GOALS ── */
 .goal-section{margin-bottom:1.25rem}
 .goal-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
@@ -3256,7 +3262,7 @@ function renderForecast(){
   }).sort((a,b)=>b.recommended-a.recommended);
 
   el.innerHTML=`<div style="overflow-x:auto">
-  <table class="data-table" style="font-size:12px;min-width:640px">
+  <table class="data-table fc-table" style="font-size:12px;min-width:640px">
     <thead><tr>
       <th>สินค้า</th>
       <th style="text-align:right">สต็อก</th>
